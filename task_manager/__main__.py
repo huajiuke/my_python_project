@@ -3,6 +3,7 @@ from datetime import datetime
 import sys
 import logging
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -25,15 +26,19 @@ class TaskManager:
     def _save(self):
         self.storage.save(self.tasks)
 
-    def add(self, title: str, description: str = "", priority: str = "medium"):
+    def add(self, title: str, description: str = "", priority: str = "medium",
+            due_date: Optional[datetime] = None):
         """添加新任务"""
         prio_map = {"l": Priority.LOW, "m": Priority.MEDIUM,
                      "h": Priority.HIGH, "u": Priority.URGENT}
         prio = prio_map.get(priority[0].lower(), Priority.MEDIUM)
-        task = Task(title, description, prio)
+        task = Task(title, description, prio, due_date)
         self.tasks.append(task)
         self._save()
-        print("  [{}] {}".format(task.id[:6], task.title))
+        due_str = ""
+        if due_date:
+            due_str = " 截止: " + due_date.strftime("%m-%d")
+        print("  [{}] {}{}".format(task.id[:6], task.title, due_str))
 
     def list(self, show_all: bool = False):
         """列出任务"""
@@ -75,7 +80,7 @@ class TaskManager:
         print("  未找到ID以 {} 开头的任务".format(task_id))
 
     def clear_done(self):
-        """清空任务"""
+        """清空已完成任务"""
         count = 0
         for i in range(len(self.tasks) - 1, -1, -1):
             if self.tasks[i].status == TaskStatus.COMPLETED:
@@ -87,17 +92,24 @@ class TaskManager:
             print("  没有已完成的任务")
 
 
+def parse_date(date_str: str) -> Optional[datetime]:
+    """把 '2026-08-01' 转成 datetime 对象，格式不对就返回 None"""
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        print("  日期格式错误，应为 YYYY-MM-DD，忽略截止日期")
+        return None
 
 
 def print_help():
     print("""用法:
-  add <标题> [-d <描述>] [-p low|medium|high|urgent]      添加任务
-  list [--all]                                          列出任务
-  done <id>                                             标记完成
-  del <id>                                              删除任务
-  help                                                  显示帮助
-  exit                                                  退出
-  clear                                                 清除已完成任务
+  add <标题> [-d <描述>] [-p low|medium|high|urgent] [--due YYYY-MM-DD]  添加任务
+  list [--all]                                                            列出任务
+  done <id>                                                               标记完成
+  del <id>                                                                删除任务
+  clear                                                                   清除已完成任务
+  help                                                                    显示帮助
+  exit                                                                    退出
 """)
 
 
@@ -127,12 +139,21 @@ def main():
             title = parts[1]
             desc = ""
             prio = "medium"
-            for i, p in enumerate(parts[2:], start=2):
-                if p == "-d" and i + 1 < len(parts):
+            due = None
+            i = 2
+            while i < len(parts):
+                if parts[i] == "-d" and i + 1 < len(parts):
                     desc = parts[i + 1]
-                elif p == "-p" and i + 1 < len(parts):
+                    i += 2
+                elif parts[i] == "-p" and i + 1 < len(parts):
                     prio = parts[i + 1]
-            mgr.add(title, desc, prio)
+                    i += 2
+                elif parts[i] == "--due" and i + 1 < len(parts):
+                    due = parse_date(parts[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            mgr.add(title, desc, prio, due)
         elif cmd == "list":
             show_all = "--all" in parts
             mgr.list(show_all)
