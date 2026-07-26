@@ -15,6 +15,9 @@ logging.basicConfig(
     format="%(levelname)s | %(message)s",
 )
 
+class TaskNotFoundError(Exception):
+    """自定义错误，任务未找到"""
+    pass
 
 class TaskManager:
     """任务管理器业务逻辑"""
@@ -67,7 +70,8 @@ class TaskManager:
                 self._save()
                 print("  [x] {} 已标记完成".format(task.title))
                 return
-        print("  未找到ID以 {} 开头的任务".format(task_id))
+        # print("  未找到ID以 {} 开头的任务".format(task_id))
+        raise TaskNotFoundError(f"  未找到ID以 {task_id} 开头的任务")
 
     def delete(self, task_id: str):
         """删除任务"""
@@ -77,7 +81,8 @@ class TaskManager:
                 self._save()
                 print("  已删除: {}".format(removed.title))
                 return
-        print("  未找到ID以 {} 开头的任务".format(task_id))
+        # print("  未找到ID以 {} 开头的任务".format(task_id))
+        raise TaskNotFoundError(f"  未找到ID以 {task_id} 开头的任务")
 
     def clear_done(self):
         """清空已完成任务"""
@@ -103,7 +108,7 @@ def parse_date(date_str: str) -> Optional[datetime]:
 
 def print_help():
     print("""用法:
-  add <标题> [-d <描述>] [-p low|medium|high|urgent] [--due YYYY-MM-DD]  添加任务
+  add <标题> [-d <描述>] [-p low|medium|high|urgent] [--due YYYY-MM-DD]     添加任务
   list [--all]                                                            列出任务
   done <id>                                                               标记完成
   del <id>                                                                删除任务
@@ -158,9 +163,17 @@ def main():
             show_all = "--all" in parts
             mgr.list(show_all)
         elif cmd == "done" and len(parts) >= 2:
-            mgr.done(parts[1])
+            # mgr.done(parts[1])
+            try:
+                mgr.done(parts[1])
+            except TaskNotFoundError as e:
+                print(e)
         elif cmd == "del" and len(parts) >= 2:
-            mgr.delete(parts[1])
+            # mgr.delete(parts[1])
+            try:
+                mgr.delete(parts[1])
+            except TaskNotFoundError as e:
+                print(e)
         elif cmd == "clear":
             mgr.clear_done()
         else:
