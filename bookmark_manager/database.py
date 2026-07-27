@@ -1,38 +1,46 @@
 """书签管理器 - 数据库连接与 CRUD 操作"""
 
 from datetime import datetime
-from pathlib import Path
 from typing import List, Optional
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker, Session
 
 from bookmark_manager.models import Base, User, Bookmark
 
 
-# ── 数据库初始化 ──────────────────────────────
+engine = create_engine("sqlite:///bookmarks.db", echo=False)
+Base.metadata.create_all(engine)
 
-def init_db(db_path: str = "bookmarks.db") -> Session:
-    """创建数据库连接、建表、返回 Session"""
-    engine = create_engine(f"sqlite:///{db_path}", echo=False)
-    Base.metadata.create_all(engine)      # 自动建表（CREATE TABLE IF NOT EXISTS）
-    session = Session(engine)
-    return session
+SessionLocal = sessionmaker(bind=engine)
+
+
+@contextmanager
+def get_session():
+    """自动提交/回滚/关闭的 Session 上下文"""
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 # ── 用户 CRUD ────────────────────────────────
 
 def create_user(session: Session, username: str) -> User:
-    """创建用户"""
     user = User(username=username)
     session.add(user)
-    session.commit()
+    session.flush()
     print(f"  用户创建成功: {user.username} (id={user.id})")
     return user
 
 
 def list_users(session: Session) -> List[User]:
-    """列出所有用户"""
     users = session.query(User).all()
     if not users:
         print("  （暂无用户）")
@@ -43,27 +51,27 @@ def list_users(session: Session) -> List[User]:
 
 
 def get_user_by_name(session: Session, username: str) -> Optional[User]:
-    """按用户名查找"""
     return session.query(User).filter(User.username == username).first()
 
 
 # ── 书签 CRUD ────────────────────────────────
 
-def add_bookmark(session: Session, user: User, title: str,
-                 url: str, description: str = "") -> Bookmark:
-    """给指定用户添加书签"""
+def add_bookmark(session: Session, user_id: int, title: str,
+                 url: str, description: str = "") -> Optional[Bookmark]:
+    user = session.get(User, user_id)
+    if not user:
+        print("  用户不存在")
+        return None
     bm = Bookmark(title=title, url=url, description=description, user=user)
     session.add(bm)
-    session.commit()
     print(f"  书签添加成功: {bm.title}")
     return bm
 
 
-def list_bookmarks(session: Session, user: User = None) -> List[Bookmark]:
-    """列书签，可选按用户过滤"""
+def list_bookmarks(session: Session, user_id: int = None) -> List[Bookmark]:
     query = session.query(Bookmark)
-    if user:
-        query = query.filter(Bookmark.user_id == user.id)
+    if user_id:
+        query = query.filter(Bookmark.user_id == user_id)
 
     bookmarks = query.all()
     if not bookmarks:
@@ -71,17 +79,15 @@ def list_bookmarks(session: Session, user: User = None) -> List[Bookmark]:
         return []
 
     for bm in bookmarks:
-        print(f"  [{bm.id}] {bm.title}  ({bm.url})  - {bm.user.username}")
+        print(f"  [{bm.id}] {bm.title}  ({bm.url})")
     return bookmarks
 
 
 def delete_bookmark(session: Session, bookmark_id: int) -> bool:
-    """按 ID 删除书签"""
-    bm = session.query(Bookmark).filter(Bookmark.id == bookmark_id).first()
+    bm = session.get(Bookmark, bookmark_id)
     if not bm:
         print(f"  书签 {bookmark_id} 不存在")
         return False
     session.delete(bm)
-    session.commit()
     print(f"  已删除书签: {bm.title}")
     return True
