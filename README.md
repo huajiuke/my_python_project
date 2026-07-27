@@ -16,125 +16,126 @@
 
 ---
 
-## 二、学习计划（按周推进）
+## 二、项目与知识点完成情况
+
+### ✅ 阶段一：基础巩固（完成）
+
+| 项目 | 知识点 | 状态 |
+|------|--------|------|
+| **task_manager** | 类、对象、实例方法、`__str__`/`__repr__`、`@classmethod`、枚举 Enum | ✅ |
+| | JSON 序列化/反序列化、uuid、datetime、pathlib | ✅ |
+| | f-string / .format()、类型提示 | ✅ |
+| | 包与模块组织、`__init__.py`、`python -m` 运行 | ✅ |
+| | 虚拟环境 venv、requirements.txt | ✅ |
+| | 异常处理 try/except、自定义异常 | ✅ |
+| | Git 分支、合并、PR 流程 | ✅ |
+| **知识库** | `knowledge_notes.md` — 继承、装饰器、上下文管理器、生成器、迭代器 | 📝 |
+| | `knowledge_first_week.md` — 已学知识点 + 代码样例 | 📝 |
+| | `python_reference/magic_methods.md` — 魔术方法速查表 | 📝 |
+
+### ✅ 阶段二：数据库与 SQLAlchemy ORM（完成）
+
+| 项目 | 知识点 | 状态 |
+|------|--------|------|
+| **bookmark_manager** | SQLAlchemy ORM：Engine、Session、DeclarativeBase | ✅ |
+| | Mapped + mapped_column 字段定义 | ✅ |
+| | ForeignKey + relationship 一对多关系 | ✅ |
+| | CRUD：增删改查完整操作 | ✅ |
+| | `sessionmaker` + `scoped_session` 工厂模式 | ✅ |
+| | `@contextmanager` 自动提交/回滚/关闭 Session | ✅ |
+| | `session.flush()` vs `session.commit()` 的区别 | ✅ |
+| **知识库** | `python_reference/sqlalchemy_guide.md` — ORM 速查 + 综合示例 | 📝 |
+
+### 🔲 阶段三：后端开发 FastAPI（下一阶段）
+
+| 周次 | 内容 |
+|------|------|
+| 第5周 | HTTP、RESTful API、FastAPI 路由与参数 |
+| 第6周 | Pydantic 模型 + FastAPI + SQLAlchemy 集成 |
+| 第7周 | JWT 用户认证、密码哈希 |
+| 第8周 | 依赖注入、错误处理、中间件 |
+| 第9-10周 | Docker 部署 FastAPI + MySQL |
+
+### 🔲 阶段四：扩展进阶
+
+| 周次 | 内容 |
+|------|------|
+| 第11周 | Redis 缓存 |
+| 第12周 | 异步编程、Celery |
+
+### 🔄 贯穿全程
+
+| 内容 | 状态 |
+|------|------|
+| LeetCode 刷题 | ✅ 本地测试工具已就绪 `leetcode_tool/` |
+| Python 八股文 | 📝 知识库持续积累中 |
 
 ---
 
-### 阶段一：基础巩固（第1-2周）
+## 三、Workspace 目录结构
 
-你已经有基础的 Python 语法，这阶段重点是「把 Python 用专业」而不是「学会 Python」。
-
-| 周次 | 内容 | 周末任务 |
-|------|------|----------|
-| **第1周** | 面向对象编程（类、继承、魔术方法、装饰器、上下文管理器）<br>Git 工作流（分支、PR、冲突解决）<br>虚拟环境与依赖管理（venv + requirements.txt） | **完成项目**：用 OOP 写一个命令行任务管理器（TaskManager），包含添加/删除/标记完成/保存到文件，上传 GitHub |
-| **第2周** | 生成器与迭代器<br>异常处理与日志（logging 模块）<br>文件操作（JSON/CSV 读写）<br>包与模块组织 | **完善项目**：给任务管理器增加日志、异常处理、JSON 持久化、重构为合适的包结构 |
-
----
-
-### 阶段二：数据库与SQL（第3-4周）
-
-| 周次 | 内容 | 周末任务 |
-|------|------|----------|
-| **第3周** | SQL 核心：SELECT、JOIN、GROUP BY、HAVING、子查询<br>SQLite 实操 | **练习**：找一个人力资源或电商数据集（Kaggle），写 10 个 SQL 查询，从简单 SELECT 到复杂窗口函数 |
-| **第4周** | Python 操作数据库：sqlite3 → SQLAlchemy ORM<br>MySQL 安装与基本管理（你有运维底子，装 MySQL 小菜一碟） | **完成项目**：用 SQLAlchemy 设计一个简单的书签管理系统（Bookmark Manager），包含用户表和书签表，实现增删改查 |
-
----
-
-### 阶段三：后端核心（第5-10周）
-
-这是你的主战场。六周内完成从零到能写完整后端 API。
-
-| 周次 | 内容 | 周末任务 |
-|------|------|----------|
-| **第5周** | HTTP 协议、RESTful API 设计原则<br>FastAPI 入门：路由、路径参数、查询参数、请求体 | 写一个简单的图书 API（纯内存存储），练习 GET/POST/PUT/DELETE |
-| **第6周** | Pydantic 模型（数据验证、序列化）<br>FastAPI + SQLAlchemy 集成 | 把图书 API 改为数据库持久化版本，连接 MySQL |
-| **第7周** | 用户认证：JWT（PyJWT）、OAuth2<br>密码哈希（passlib + bcrypt） | 给图书 API 添加用户注册/登录，JWT 保护需要登录的接口 |
-| **第8周** | 依赖注入（FastAPI Depends）<br>API 版本控制与错误处理<br>FastAPI 中间件 | 重构项目，增加统一的异常处理、请求日志中间件 |
-| **第9-10周** | Docker：Dockerfile、docker-compose<br>部署：用 docker-compose 同时起 FastAPI + MySQL | **项目整合**：把你 6-8 周做的 API 项目 docker 化，写 docker-compose.yml。如果你有兴趣，用阿里云/腾讯云免费服务器部署上线 |
-
-> **关键项目**（简历核心）：一个带用户认证的 RESTful API 项目，Docker 部署，GitHub 完整提交记录
+```
+D:\13155\PythonLearn/
+├── README.md                        # 学习计划
+├── requirements.txt                 # 依赖清单
+├── .gitignore
+├── venv/                            # 虚拟环境
+│
+├── task_manager/                    # 阶段一：CLI 任务管理器
+│   ├── __init__.py / __main__.py
+│   ├── models.py / storage.py
+│
+├── bookmark_manager/                # 阶段二：书签管理器 (SQLAlchemy)
+│   ├── __init__.py / __main__.py
+│   ├── models.py / database.py
+│
+├── leetcode_tool/                   # 本地 LeetCode 测试工具
+│   ├── structures.py                #   ListNode / TreeNode 互转
+│   ├── runner.py                    #   测试运行器
+│   └── problems/                    #   题目文件
+│       ├── example.py               #   3 道示例题
+│       └── mergeKLists.py           #   合并 K 个升序链表
+│
+├── python_reference/                # Python 知识库
+│   ├── magic_methods.md
+│   └── sqlalchemy_guide.md
+│
+├── knowledge_notes.md               # 待学知识点
+└── knowledge_first_week.md          # 已学知识点 + 代码样例
+```
 
 ---
 
-### 阶段四：扩展与进阶（第11-12周）
-
-| 周次 | 内容 | 周末任务 |
-|------|------|----------|
-| **第11周** | Redis 基础：缓存、Session 存储<br>FastAPI + Redis 实现接口缓存 | 给已有 API 添加 Redis 缓存层 |
-| **第12周** | 异步编程：asyncio、async/await<br>FastAPI 异步接口 | 写一个异步爬虫或异步文件处理工具。了解 Celery 基本概念 |
-
----
-
-### 阶段五（贯穿全程）：算法与面试
-
-| 内容 | 节奏 | 目标 |
-|------|------|------|
-| LeetCode 刷题 | 周内每天 1 题（30-40分钟） | Easy 30 题 + Medium 20 题，重点：数组、字符串、哈希表、链表、二叉树、动态规划基础 |
-| Python 八股文 | 周末碎片时间 | GIL、深浅拷贝、垃圾回收、*args/**kwargs、闭包、装饰器原理 |
-
----
-
-### 阶段六：冲刺求职（第13周起）
-
-- 整理 GitHub 主页 + README（放项目介绍、架构图、技术栈标签）
-- 写简历：重点包装「项目经验」+ 你的运维背景（部署、容器化、Linux 是加分项）
-- 模拟面试：准备好 STAR 法则讲项目
-- 开始投递：Boss直聘 / 拉勾 / 内推
-
----
-
-## 三、学习节奏模板
+## 四、学习节奏模板
 
 ### 周内（每天1-2h）
-`
+```
 19:00-19:10  回顾昨天
 19:10-20:00  学新内容（看文档/视频 + 写代码）
 20:00-20:30  做练习题或 LeetCode
 20:30-20:40  整理笔记 / 提交代码
-`
+```
 
 ### 周末（每天8h）
-`
+```
 上午 09:00-12:00  项目开发（核心产出时间）
 下午 14:00-17:00  项目开发 / 复习本周知识
 晚上 19:30-21:30  刷题 + 下周预习
-`
+```
 
 ---
 
-## 四、推荐资源
+## 五、配套知识库
 
-| 内容 | 资源 | 备注 |
-|------|------|------|
-| Python 进阶 | 《流畅的Python》（只看前1/3就够了） | 不买也行，看官方文档+博客 |
-| FastAPI | 官方文档 (fastapi.tiangolo.com) | 最好的教程就是官方文档 |
-| FastAPI 视频 | B站搜「FastAPI 教程」或「FastAPI 全流程」 | 挑播放量最高的 |
-| SQL | 《SQL必知必会》 | 小册子，2-3天翻完 |
-| SQLAlchemy | 官方文档 + B站教程 | |
-| Docker | B站搜「Docker 实战」 | 你有运维底子，半天搞懂 |
-| 刷题 | LeetCode 中国 (leetcode.cn) | 开通会员更好 |
-| 实战数据 | Kaggle (kaggle.com) | 数据集来源 |
+| 文件 | 内容 |
+|------|------|
+| `knowledge_notes.md` | 第1-2周待学知识点：继承、装饰器、上下文管理器、生成器、迭代器、异常处理、venv、Git分支 |
+| `knowledge_first_week.md` | 第1周已学知识点含代码样例+综合练习 |
+| `python_reference/magic_methods.md` | 7 类常用魔术方法速查表 |
+| `python_reference/sqlalchemy_guide.md` | SQLAlchemy ORM 框架指南 + 综合示例 |
 
 ---
 
-## 五、你的核心优势（求职时放大）
+## 六、GitHub
 
-你有运维背景，面试时可以强调：
-
-1. **理解部署流程**：docker、nginx、反向代理、域名、HTTPS —— 很多纯后端开发对部署一知半解，你懂
-2. **Linux 熟练**：文件系统、权限、进程管理、日志排查 —— 这是后端开发的日常
-3. **故障排查经验**：看日志、定位问题、紧急恢复 —— 开发岗很看重的软技能
-4. **云平台经验**：你接触过云软件变更，等于有云环境经验
-
-**你的简历故事**可以这样写：做了 X 年运维，日常处理服务器和云平台变更，其间用 Python 写自动化脚本解决重复工作 -> 因此决定系统学习后端开发 -> 完成了 X 项目（带认证的 API、Docker 部署）-> 熟悉全链路开发+部署。
-
----
-
-## 六、下一步
-
-告诉我你现在：
-1. 有没有用 VS Code 或 PyCharm？（我推荐 VS Code）
-2. Git 是否装好了？GitHub 账号有吗？
-3. Python 版本是多少？
-
-确认后我们直接从**第1周**开始，我带你写第一个项目。
+所有代码已上传：[https://github.com/huajiuke/my_python_project](https://github.com/huajiuke/my_python_project)
