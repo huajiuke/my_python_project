@@ -1,4 +1,4 @@
-# Python 后端求职学习计划（定制版）
+﻿# Python 后端求职学习计划（定制版）
 
 > 背景：运维岗（云软件变更）→ 后端开发
 > 时间：周内 1-2h/天 + 周末 8h/天 ≈ 20-24h/周
@@ -29,8 +29,8 @@
 | | 虚拟环境 venv、requirements.txt | ✅ |
 | | 异常处理 try/except、自定义异常 | ✅ |
 | | Git 分支、合并、PR 流程 | ✅ |
-| **知识库** | `knowledge_notes.md` — 继承、装饰器、上下文管理器、生成器、迭代器 | 📝 |
-| | `knowledge_first_week.md` — 已学知识点 + 代码样例 | 📝 |
+| **知识库** | `docs/knowledge_notes.md` — 继承、装饰器、上下文管理器、生成器、迭代器 | 📝 |
+| | `docs/knowledge_first_week.md` — 已学知识点 + 代码样例 | 📝 |
 | | `python_reference/magic_methods.md` — 魔术方法速查表 | 📝 |
 
 ### ✅ 阶段二：数据库与 SQLAlchemy ORM（完成）
@@ -46,7 +46,7 @@
 | | `session.flush()` vs `session.commit()` 的区别 | ✅ |
 | **知识库** | `python_reference/sqlalchemy_guide.md` — ORM 速查 + 综合示例 | 📝 |
 
-### 🔲 阶段三：后端开发 FastAPI（下一阶段）
+### 🚧 阶段三：后端开发 FastAPI（进行中）
 
 | 周次 | 内容 |
 |------|------|
@@ -55,6 +55,7 @@
 | 第7周 | JWT 用户认证、密码哈希 |
 | 第8周 | 依赖注入、错误处理、中间件 |
 | 第9-10周 | Docker 部署 FastAPI + MySQL |
+| 学习目录 | `fastapi_learning/`：基础/进阶/SQLAlchemy 笔记 + `fastApiProject/` 示例代码 | 🚧 |
 
 ### 🔲 阶段四：扩展进阶
 
@@ -62,6 +63,12 @@
 |------|------|
 | 第11周 | Redis 缓存 |
 | 第12周 | 异步编程、Celery |
+
+### 📖 AI Agent 补充知识（面试了解）
+
+| 内容 | 状态 |
+|------|------|
+| AI Agent 核心概念、架构模式、框架对比、面试题 | ✅ [knowledge_ai_agent.md](docs/knowledge_ai_agent.md) |
 
 ### 🔄 贯穿全程
 
@@ -100,8 +107,26 @@ D:\13155\PythonLearn/
 │   ├── magic_methods.md
 │   └── sqlalchemy_guide.md
 │
-├── knowledge_notes.md               # 待学知识点
-└── knowledge_first_week.md          # 已学知识点 + 代码样例
+├── docs/                            # 学习文档与简历
+│   ├── knowledge_notes.md
+│   ├── knowledge_first_week.md
+│   ├── knowledge_ai_agent.md
+│   └── resume_python_backend_dev.md
+│
+├── fastapi_learning/                # 阶段三：FastAPI
+│   ├── 1.Fasapi基础.md               # FastAPI 基础笔记
+│   ├── 2.FastApi进阶.md              # FastAPI 进阶笔记
+│   ├── 3.FastApi+SQLAlchemy.md       # FastAPI + SQLAlchemy 集成笔记
+│   └── fastApiProject/               # FastAPI 示例项目
+│       ├── main.py
+│       ├── database.py
+│       ├── models.py
+│       ├── schemas.py
+│       ├── dependencies.py
+│       ├── middleware.py
+│       ├── routers/
+│       ├── static/
+│       └── test_main.http
 ```
 
 ---
@@ -129,10 +154,11 @@ D:\13155\PythonLearn/
 
 | 文件 | 内容 |
 |------|------|
-| `knowledge_notes.md` | 第1-2周待学知识点：继承、装饰器、上下文管理器、生成器、迭代器、异常处理、venv、Git分支 |
-| `knowledge_first_week.md` | 第1周已学知识点含代码样例+综合练习 |
+| `docs/knowledge_notes.md` | 第1-2周待学知识点：继承、装饰器、上下文管理器、生成器、迭代器、异常处理、venv、Git分支 |
+| `docs/knowledge_first_week.md` | 第1周已学知识点含代码样例+综合练习 |
 | `python_reference/magic_methods.md` | 7 类常用魔术方法速查表 |
 | `python_reference/sqlalchemy_guide.md` | SQLAlchemy ORM 框架指南 + 综合示例 |
+| `docs/knowledge_ai_agent.md` | AI Agent 学习笔记：概念、架构模式、框架对比、面试题 + 代码示例 |
 
 ---
 
