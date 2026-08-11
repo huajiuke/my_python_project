@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 
 router = APIRouter(tags=["文件与响应"])
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
 @router.get(
@@ -31,7 +34,7 @@ async def get_html():
 )
 async def get_file():
     """返回静态文件。"""
-    return FileResponse("static/hello.html")
+    return FileResponse(STATIC_DIR / "hello.html")
 
 
 @router.get(

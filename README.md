@@ -55,7 +55,7 @@
 | 第7周 | JWT 用户认证、密码哈希 |
 | 第8周 | 依赖注入、错误处理、中间件 |
 | 第9-10周 | Docker 部署 FastAPI + MySQL |
-| 学习目录 | `fastapi_learning/`：基础/进阶/SQLAlchemy 笔记 + `fastApiProject/` 示例代码 | 🚧 |
+| 学习目录 | `fastapi_learning/`：基础/进阶/SQLAlchemy/JWT 笔记 + `fastApiProject/` 示例代码 | 🚧 |
 
 ### 🔲 阶段四：扩展进阶
 
@@ -117,16 +117,24 @@ D:\13155\PythonLearn/
 │   ├── 1.Fasapi基础.md               # FastAPI 基础笔记
 │   ├── 2.FastApi进阶.md              # FastAPI 进阶笔记
 │   ├── 3.FastApi+SQLAlchemy.md       # FastAPI + SQLAlchemy 集成笔记
+│   ├── 4.Pydantic练习.md             # Pydantic 练习题
+│   ├── 5.JWT认证.md                  # JWT 认证完整流程
 │   └── fastApiProject/               # FastAPI 示例项目
-│       ├── main.py
-│       ├── database.py
-│       ├── models.py
-│       ├── schemas.py
-│       ├── dependencies.py
-│       ├── middleware.py
-│       ├── routers/
-│       ├── static/
-│       └── test_main.http
+│       ├── main.py                   # 应用入口
+│       ├── test_main.http            # HTTP 测试文件
+│       ├── tests/                    # pytest 自动化测试
+│       └── app/                      # 业务代码
+│           ├── database.py
+│           ├── models.py
+│           ├── schemas.py
+│           ├── security.py
+│           ├── dependencies.py
+│           ├── middleware.py
+│           ├── routers/
+│           ├── static/
+│           ├── requirements.txt
+│           ├── requirements-dev.txt
+│           └── API文档.md
 ```
 
 ---

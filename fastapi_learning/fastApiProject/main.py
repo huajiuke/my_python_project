@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from database import Base, engine
-from middleware import register_middlewares
-from routers import files, items, users
+from app.database import Base, engine
+from app.middleware import register_middlewares
+from app.routers import auth, files, items, users
+
+STATIC_DIR = Path(__file__).resolve().parent / "app" / "static"
 
 
 @asynccontextmanager
@@ -19,11 +22,12 @@ app = FastAPI(title="FastAPI 学习项目", lifespan=lifespan)
 
 register_middlewares(app)
 
+app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(items.router)
 app.include_router(files.router)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get(

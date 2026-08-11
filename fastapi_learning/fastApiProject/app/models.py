@@ -10,7 +10,7 @@
 # 4. 从 sqlalchemy.orm 导入 Mapped, mapped_column, relationship
 # 5. 从 database 导入 Base
 # TODO: 补全导入
-from database import Base
+from app.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional
 from datetime import datetime

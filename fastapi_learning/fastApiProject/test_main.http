@@ -1,4 +1,4 @@
-﻿# Test your FastAPI endpoints
+# Test your FastAPI endpoints
 
 GET http://127.0.0.1:8080/
 Accept: application/json
@@ -14,16 +14,23 @@ POST http://127.0.0.1:8080/users/register
 Content-Type: application/json
 
 {
-  "username": "zhangsan",
-  "password": "123456",
+  "username": "api_user",
+  "password": "secret123",
   "age": 25,
-  "email": "zhangsan@example.com"
+  "email": "api_user@example.com"
 }
 
 ###
 
+POST http://127.0.0.1:8080/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=api_user&password=secret123
+
+###
+
 GET http://127.0.0.1:8080/users/me
-Authorization: Bearer demo-token
+Authorization: Bearer <替换成登录返回的access_token>
 
 ###
 
@@ -39,6 +46,7 @@ Accept: application/json
 
 POST http://127.0.0.1:8080/items
 Content-Type: application/json
+Authorization: Bearer <替换成登录返回的access_token>
 
 {
   "name": "Python入门",
@@ -47,13 +55,12 @@ Content-Type: application/json
 
 ###
 
-GET http://127.0.0.1:8080/items/db
+GET http://127.0.0.1:8080/items/1
 Accept: application/json
 
 ###
 
-GET http://127.0.0.1:8080/items/1
-Accept: application/json
+GET http://127.0.0.1:8080/json
 
 ###
 
@@ -62,6 +69,17 @@ GET http://127.0.0.1:8080/html
 ###
 
 GET http://127.0.0.1:8080/file
+
+###
+
+GET http://127.0.0.1:8080/redirect
+
+###
+
+POST http://127.0.0.1:8080/send
+Content-Type: application/x-www-form-urlencoded
+
+email=test@example.com
 
 ###
 
@@ -78,3 +96,7 @@ Content-Type: text/plain
 
 hello
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+
+GET http://127.0.0.1:8080/static/hello.html
