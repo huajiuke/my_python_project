@@ -1,6 +1,7 @@
 """FastAPI 项目核心接口自动化测试。"""
 
 import os
+from datetime import datetime
 
 os.environ["DATABASE_URL"] = "sqlite:///./tests/test_fastapi.db"
 os.environ["SECRET_KEY"] = "test-secret-key-with-at-least-32-bytes"
@@ -10,6 +11,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.database import Base, engine
+from app.dependencies import get_current_user
+from app.models import User
 from main import app
 
 
@@ -133,3 +136,45 @@ def test_update_and_delete_item_owner_only(client):
     owner_delete = client.delete(f"/items/{item_id}", headers=owner_headers)
     assert owner_delete.status_code == 204
     assert client.get(f"/items/{item_id}").status_code == 404
+
+
+def test_http_error_format(client):
+    response = client.get("/users/99999")
+    assert response.status_code == 404
+    assert response.json()["code"] == "HTTP_ERROR"
+    assert "message" in response.json()
+
+
+def test_validation_error_format(client):
+    response = client.get("/users/not-an-int")
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "VALIDATION_ERROR"
+    assert body["message"] == "参数校验失败"
+    assert isinstance(body["detail"], list)
+
+
+def test_request_id_header(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers.get("X-Request-ID")
+
+
+def test_dependency_override(client):
+    def fake_current_user():
+        return User(
+            id=999,
+            username="fake_user",
+            password="hashed",
+            age=1,
+            email=None,
+            created_at=datetime.now(),
+        )
+
+    app.dependency_overrides[get_current_user] = fake_current_user
+    try:
+        response = client.get("/users/me")
+        assert response.status_code == 200
+        assert response.json()["username"] == "fake_user"
+    finally:
+        app.dependency_overrides.clear()
