@@ -70,6 +70,14 @@
 |------|------|
 | AI Agent 核心概念、架构模式、框架对比、面试题 | ✅ [knowledge_ai_agent.md](docs/knowledge_ai_agent.md) |
 
+### 🚧 Agent 应用开发（进行中）
+
+| 内容 | 状态 |
+|------|------|
+| 学习链路与阶段产出 | ✅ [agent_dev_learning_plan.md](docs/agent_dev_learning_plan.md) |
+| 从零手写 Tool Calling Agent | ✅ [agent_learning/](agent_learning/README.md) |
+| RAG 知识库问答 | 🔲 下一阶段 |
+
 ### 🔄 贯穿全程
 
 | 内容 | 状态 |
@@ -111,8 +119,13 @@ D:\13155\PythonLearn/
 │   ├── knowledge_notes.md
 │   ├── knowledge_first_week.md
 │   ├── knowledge_ai_agent.md
+│   ├── agent_dev_learning_plan.md
 │   ├── python_interview_cheatsheet.md
 │   └── resume_python_backend_dev.md
+│
+├── agent_learning/                # Agent 从零手写项目
+│   ├── tool_calling_agent.py      #   Tool + Registry + MockLLM + Agent 循环
+│   └── test_tool_calling_agent.py #   核心循环单元测试
 │
 ├── obsidian/                        # Obsidian 知识库
 │   ├── MOC.md
@@ -180,6 +193,7 @@ D:\13155\PythonLearn/
 | `python_reference/magic_methods.md` | 7 类常用魔术方法速查表 |
 | `python_reference/sqlalchemy_guide.md` | SQLAlchemy ORM 框架指南 + 综合示例 |
 | `docs/knowledge_ai_agent.md` | AI Agent 学习笔记：概念、架构模式、框架对比、面试题 + 代码示例 |
+| `docs/agent_dev_learning_plan.md` | Agent 应用开发学习链路：阶段目标、项目产出、面试能力对照 |
 
 ---
 
