@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
+from app.exception_handlers import register_exception_handlers
 from app.middleware import register_middlewares
 from app.routers import auth, files, items, users
 
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="FastAPI 学习项目", lifespan=lifespan)
 
 register_middlewares(app)
+register_exception_handlers(app)
 
 app.include_router(auth.router)
 app.include_router(users.router)

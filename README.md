@@ -55,7 +55,7 @@
 | 第7周 | JWT 用户认证、密码哈希 |
 | 第8周 | 依赖注入、错误处理、中间件 |
 | 第9-10周 | Docker 部署 FastAPI + MySQL |
-| 学习目录 | `fastapi_learning/`：基础/进阶/SQLAlchemy/JWT 笔记 + `fastApiProject/` 示例代码 | 🚧 |
+| 学习目录 | `fastapi_learning/`：基础/进阶/SQLAlchemy/JWT/第8周笔记 + `fastApiProject/` 示例代码 | 🚧 |
 
 ### 🔲 阶段四：扩展进阶
 
@@ -75,7 +75,7 @@
 | 内容 | 状态 |
 |------|------|
 | LeetCode 刷题 | ✅ 本地测试工具已就绪 `leetcode_tool/` |
-| Python 八股文 | 📝 知识库持续积累中 |
+| Python 八股文 | ✅ [python_interview_cheatsheet.md](docs/python_interview_cheatsheet.md) |
 
 ---
 
@@ -111,7 +111,16 @@ D:\13155\PythonLearn/
 │   ├── knowledge_notes.md
 │   ├── knowledge_first_week.md
 │   ├── knowledge_ai_agent.md
+│   ├── python_interview_cheatsheet.md
 │   └── resume_python_backend_dev.md
+│
+├── obsidian/                        # Obsidian 知识库
+│   ├── MOC.md
+│   ├── 01-Python基础/
+│   ├── 02-数据库/
+│   ├── 03-FastAPI/
+│   ├── 04-AI与职业/
+│   └── 05-面试/
 │
 ├── fastapi_learning/                # 阶段三：FastAPI
 │   ├── 1.Fasapi基础.md               # FastAPI 基础笔记
@@ -119,6 +128,8 @@ D:\13155\PythonLearn/
 │   ├── 3.FastApi+SQLAlchemy.md       # FastAPI + SQLAlchemy 集成笔记
 │   ├── 4.Pydantic练习.md             # Pydantic 练习题
 │   ├── 5.JWT认证.md                  # JWT 认证完整流程
+│   ├── 6.依赖注入错误处理中间件.md     # 第 8 周笔记
+│   ├── 7.代码逐行注释.md              # 项目源码逐行注释
 │   └── fastApiProject/               # FastAPI 示例项目
 │       ├── main.py                   # 应用入口
 │       ├── test_main.http            # HTTP 测试文件
@@ -130,6 +141,8 @@ D:\13155\PythonLearn/
 │           ├── security.py
 │           ├── dependencies.py
 │           ├── middleware.py
+│           ├── exceptions.py
+│           ├── exception_handlers.py
 │           ├── routers/
 │           ├── static/
 │           ├── requirements.txt
