@@ -19,6 +19,8 @@
 | GET | `/users/{user_id}` | 按 ID 查询用户 | 否 |
 | GET | `/news` | 查询参数示例 | 否 |
 | GET | `/items` | 商品分页列表 | 否 |
+| GET | `/items/cached` | 商品列表缓存示例 | 否 |
+| GET | `/cache/stats` | 缓存命中统计 | 否 |
 | POST | `/items` | 创建商品（归属当前用户） | 是 |
 | GET | `/items/{item_id}` | 查询单个商品 | 否 |
 | PUT | `/items/{item_id}` | 更新商品（仅限本人） | 是 |
@@ -201,7 +203,9 @@ username=authuser&password=abc123
 ```
 
 ### GET /items
-商品分页列表。
+商品分页列表，已接入 Redis 分页缓存。
+
+缓存 key：`items:list:{page}:{size}`
 
 查询参数：
 

@@ -1,14 +1,25 @@
 """商品路由。"""
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import Pagination, require_login
 from app.models import Item, User
+from app.redis_client import redis_client
 from app.schemas import ItemCreate, ItemOut, ItemUpdate
 
 router = APIRouter(tags=["商品"])
+
+
+def clear_items_cache():
+    """清除商品列表缓存。"""
+    for key in redis_client.scan_iter("items:list:*"):
+        redis_client.delete(key)
+    redis_client.delete("items:list")
 
 
 @router.get(
@@ -32,8 +43,20 @@ async def get_news(
 )
 def list_items(pagination: Pagination = Depends(), db: Session = Depends(get_db)):
     """分页查询商品列表。"""
+    cache_key = f"items:list:{pagination.page}:{pagination.size}"
+    cached = redis_client.get(cache_key)
+    if cached is not None:
+        redis_client.incr("stats:cache_hit")
+        return json.loads(cached)
+    redis_client.incr("stats:cache_miss")
     offset = (pagination.page - 1) * pagination.size
-    return db.query(Item).offset(offset).limit(pagination.size).all()
+    items = db.query(Item).offset(offset).limit(pagination.size).all()
+    redis_client.setex(
+        cache_key,
+        60,
+        json.dumps(jsonable_encoder(items)),
+    )
+    return items
 
 
 @router.post(
@@ -53,7 +76,37 @@ def create_item(
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
+    clear_items_cache()
     return db_item
+
+
+@router.get(
+    "/items/cached",
+    response_model=list[ItemOut],
+    summary="商品列表缓存示例",
+    description="先查 Redis，未命中再查 MySQL 并写入缓存 60 秒。",
+)
+def cached_items(db: Session = Depends(get_db)):
+    """Cache Aside 模式：缓存商品列表。"""
+    cache_key = "items:list"
+    cached = redis_client.get(cache_key)
+    if cached is not None:
+        return json.loads(cached)
+    items = db.query(Item).all()
+    redis_client.setex(cache_key, 60, json.dumps(jsonable_encoder(items)))
+    return items
+
+
+@router.get(
+    "/cache/stats",
+    summary="缓存命中统计",
+    description="返回 Redis 商品缓存命中/未命中次数。",
+)
+def cache_stats():
+    """查看缓存命中统计。"""
+    hits = int(redis_client.get("stats:cache_hit") or 0)
+    misses = int(redis_client.get("stats:cache_miss") or 0)
+    return {"hits": hits, "misses": misses}
 
 
 @router.get(
@@ -92,6 +145,7 @@ def update_item(
         setattr(item, field, value)
     db.commit()
     db.refresh(item)
+    clear_items_cache()
     return item
 
 
@@ -114,3 +168,4 @@ def delete_item(
         raise HTTPException(status_code=403, detail="无权操作该商品")
     db.delete(item)
     db.commit()
+    clear_items_cache()

@@ -7,3 +7,4 @@ PyMySQL==1.1.1
 SQLAlchemy==2.0.51
 greenlet==3.5.4
 cryptography==44.0.0
+redis==5.0.8
