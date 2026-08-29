@@ -54,8 +54,8 @@
 | 第6周 | Pydantic 模型 + FastAPI + SQLAlchemy 集成 |
 | 第7周 | JWT 用户认证、密码哈希 |
 | 第8周 | 依赖注入、错误处理、中间件 |
-| 第9-10周 | Docker 部署 FastAPI + MySQL |
-| 学习目录 | `fastapi_learning/`：基础/进阶/SQLAlchemy/JWT/第8周笔记 + `fastApiProject/` 示例代码 | 🚧 |
+| 第9-10周 | Docker 部署 FastAPI + MySQL（本机已跑通） |
+| 学习目录 | `fastapi_learning/`：基础/进阶/SQLAlchemy/JWT/第8周/Docker部署笔记 + `fastApiProject/` 示例代码 | 🚧 |
 
 ### 🔲 阶段四：扩展进阶
 
@@ -130,9 +130,14 @@ D:\13155\PythonLearn/
 │   ├── 5.JWT认证.md                  # JWT 认证完整流程
 │   ├── 6.依赖注入错误处理中间件.md     # 第 8 周笔记
 │   ├── 7.代码逐行注释.md              # 项目源码逐行注释
+│   ├── 8.Docker部署.md                # 第 9-10 周部署笔记
 │   └── fastApiProject/               # FastAPI 示例项目
 │       ├── main.py                   # 应用入口
 │       ├── test_main.http            # HTTP 测试文件
+│       ├── Dockerfile                # FastAPI 镜像构建
+│       ├── docker-compose.yml        # MySQL + API 编排
+│       ├── .env.example              # 环境变量模板
+│       ├── .dockerignore             # 镜像忽略文件
 │       ├── tests/                    # pytest 自动化测试
 │       └── app/                      # 业务代码
 │           ├── database.py
