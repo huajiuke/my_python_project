@@ -1,10 +1,13 @@
 """Tool Calling Agent 核心循环测试。"""
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from agent_learning.tool_calling_agent import (
     Agent,
     MockLLM,
+    OpenAICompatibleLLM,
     build_demo_registry,
 )
 
@@ -122,6 +125,66 @@ class AgentLoopTest(unittest.TestCase):
             m for m in llm.seen_messages[1] if m["role"] == "tool"
         ][0]
         self.assertIn("服务器状态", observation["content"])
+
+
+class OpenAICompatibleLLMTest(unittest.TestCase):
+    def test_missing_package_gives_install_hint(self):
+        with patch(
+            "agent_learning.tool_calling_agent.importlib.util.find_spec",
+            return_value=None,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "pip install openai"):
+                OpenAICompatibleLLM._ensure_openai_package()
+
+    def test_assistant_from_api_parses_tool_arguments(self):
+        tool_call = SimpleNamespace(
+            id="call_1",
+            type="function",
+            function=SimpleNamespace(
+                name="get_weather",
+                arguments='{"city": "北京"}',
+            ),
+        )
+        api_message = SimpleNamespace(content=None, tool_calls=[tool_call])
+
+        result = OpenAICompatibleLLM._assistant_from_api(api_message)
+
+        self.assertEqual(result["role"], "assistant")
+        self.assertEqual(
+            result["tool_calls"][0]["function"]["arguments"],
+            {"city": "北京"},
+        )
+
+    def test_assistant_from_api_keeps_direct_answer(self):
+        api_message = SimpleNamespace(content="你好", tool_calls=None)
+
+        result = OpenAICompatibleLLM._assistant_from_api(api_message)
+
+        self.assertEqual(result["content"], "你好")
+        self.assertNotIn("tool_calls", result)
+
+    def test_messages_for_api_serializes_tool_arguments(self):
+        internal_message = {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": {"city": "北京"},
+                    },
+                }
+            ],
+        }
+
+        normalized = OpenAICompatibleLLM._messages_for_api([internal_message])
+
+        self.assertEqual(
+            normalized[0]["tool_calls"][0]["function"]["arguments"],
+            '{"city": "北京"}',
+        )
 
 
 if __name__ == "__main__":

@@ -34,15 +34,39 @@
  python agent_learning/tool_calling_agent.py
  ```
 
- 运行单元测试：
+运行单元测试：
 
  ```powershell
  python -m unittest discover -s agent_learning -v
  ```
 
+ ## 切换到真实 LLM
+
+ Agent 循环已经接好 OpenAI Chat Completions 兼容接口，先安装官方 SDK：
+
+ ```powershell
+ python -m pip install openai
+ ```
+
+ 配置环境变量：
+
+ ```powershell
+ $env:OPENAI_API_KEY = "你的 API Key"
+ $env:OPENAI_BASE_URL = "可选：兼容服务地址"
+ $env:OPENAI_MODEL = "可选：默认 gpt-4o-mini"
+ ```
+
+ 用真实模型运行：
+
+ ```powershell
+ python agent_learning/tool_calling_agent.py --real
+ ```
+
+ 没有配置 API Key 时仍可运行默认的 Mock 演示，方便先理解循环本身。
+
  ## 扩展任务
 
  1. 增加 `get_current_time`、文件读取等工具，观察多工具如何选择
- 2. 把 `MockLLM` 替换成 OpenAI 兼容 API 的真实 LLM 调用
+ 2. 观察真实 LLM 返回的 `tool_calls.arguments` 是 JSON 字符串，内部如何被解析成 dict
  3. 给工具增加"只读 / 可写"权限，模拟生产环境权限控制
  4. 增加超时与重试，观察 LLM 如何从错误中恢复
