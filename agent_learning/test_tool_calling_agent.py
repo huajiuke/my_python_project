@@ -13,12 +13,15 @@ class ToolRegistryTest(unittest.TestCase):
     def test_schemas_contain_function_metadata(self):
         registry = build_demo_registry()
         schemas = registry.schemas()
-        self.assertEqual(len(schemas), 2)
+        self.assertEqual(len(schemas), 3)
 
         weather = schemas[0]["function"]
         self.assertEqual(weather["name"], "get_weather")
         self.assertIn("description", weather)
         self.assertIn("city", weather["parameters"]["properties"])
+
+        schema_names = [schema["function"]["name"] for schema in schemas]
+        self.assertIn("get_server_status", schema_names)
 
     def test_call_unknown_tool_returns_error_observation(self):
         registry = build_demo_registry()
@@ -30,6 +33,12 @@ class ToolRegistryTest(unittest.TestCase):
         result = registry.call("get_weather", {})
         self.assertIn("参数错误", result)
 
+    def test_call_server_status_returns_observation(self):
+        registry = build_demo_registry()
+        result = registry.call("get_server_status", {})
+        self.assertIn("服务器状态", result)
+        self.assertIn("CPU", result)
+
 
 class AgentLoopTest(unittest.TestCase):
     def test_direct_answer_without_tool(self):
@@ -37,7 +46,7 @@ class AgentLoopTest(unittest.TestCase):
         agent = Agent(llm=llm, tools=build_demo_registry(), verbose=False)
 
         self.assertEqual(agent.run("你好"), "你好，我不用工具。")
-        self.assertEqual(len(llm.seen_tools[0]), 2)
+        self.assertEqual(len(llm.seen_tools[0]), 3)
 
     def test_tool_call_then_final_answer(self):
         llm = MockLLM(
@@ -90,6 +99,29 @@ class AgentLoopTest(unittest.TestCase):
             m for m in llm.seen_messages[1] if m["role"] == "tool"
         ][0]
         self.assertIn("工具不存在", observation["content"])
+
+    def test_server_status_tool_call_then_final_answer(self):
+        llm = MockLLM(
+            [
+                {
+                    "type": "tool_call",
+                    "name": "get_server_status",
+                    "arguments": {},
+                },
+                {"type": "final", "content": "服务器运行正常，CPU 25%，内存 60%。"},
+            ]
+        )
+        agent = Agent(llm=llm, tools=build_demo_registry(), verbose=False)
+
+        self.assertEqual(
+            agent.run("服务器状态怎么样？"),
+            "服务器运行正常，CPU 25%，内存 60%。",
+        )
+
+        observation = [
+            m for m in llm.seen_messages[1] if m["role"] == "tool"
+        ][0]
+        self.assertIn("服务器状态", observation["content"])
 
 
 if __name__ == "__main__":

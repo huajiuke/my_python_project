@@ -185,7 +185,17 @@ def get_weather(city: str) -> str:
 
 
 def get_current_time() -> str:
+    """返回当前系统时间，格式化到秒。"""
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def get_server_status() -> str:
+    """模拟查询服务器运行状态。
+
+    实际项目中可替换为读取系统指标、调用监控 API 或查询状态服务；
+    这里先返回固定结果，方便无外部依赖地验证 Agent 工具调用链路。
+    """
+    return "服务器状态：正常，CPU 25%，内存 60%"
 
 
 def build_demo_registry() -> ToolRegistry:
@@ -210,6 +220,14 @@ def build_demo_registry() -> ToolRegistry:
             description="获取当前系统时间",
             parameters={"type": "object", "properties": {}},
             handler=get_current_time,
+        )
+    )
+    registry.register(
+        Tool(
+            name="get_server_status",
+            description="获取当前服务器的运行状态",
+            parameters={"type": "object", "properties": {}},
+            handler=get_server_status,
         )
     )
     return registry
