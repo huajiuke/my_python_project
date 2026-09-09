@@ -1,7 +1,9 @@
 """Tool Calling Agent 核心循环测试。"""
 
 import unittest
+import os
 from types import SimpleNamespace
+from pathlib import Path
 from unittest.mock import patch
 
 from agent_learning.tool_calling_agent import (
@@ -9,6 +11,15 @@ from agent_learning.tool_calling_agent import (
     MockLLM,
     OpenAICompatibleLLM,
     build_demo_registry,
+    load_dotenv,
+)
+
+
+DOTENV_FIXTURE = (
+    Path(__file__).resolve().parent
+    / "fixtures"
+    / "dotenv"
+    / "test.env"
 )
 
 
@@ -128,6 +139,35 @@ class AgentLoopTest(unittest.TestCase):
 
 
 class OpenAICompatibleLLMTest(unittest.TestCase):
+    def test_load_dotenv_sets_missing_values(self):
+        with patch.dict(os.environ, {}, clear=True):
+            load_dotenv(DOTENV_FIXTURE)
+            self.assertEqual(os.environ["OPENAI_API_KEY"], "file-api-key")
+            self.assertEqual(
+                os.environ["OPENAI_BASE_URL"],
+                "https://example.com/v1",
+            )
+            self.assertEqual(os.environ["OPENAI_MODEL"], "test-model")
+
+    def test_load_dotenv_does_not_override_existing_env(self):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "shell-key"}, clear=True):
+            load_dotenv(DOTENV_FIXTURE)
+            self.assertEqual(os.environ["OPENAI_API_KEY"], "shell-key")
+            self.assertEqual(
+                os.environ["OPENAI_BASE_URL"],
+                "https://example.com/v1",
+            )
+
+    def test_load_dotenv_returns_none_when_missing(self):
+        with patch.dict(os.environ, {}, clear=True):
+            missing = (
+                Path(__file__).resolve().parent
+                / "fixtures"
+                / "dotenv"
+                / "missing.env"
+            )
+            self.assertIsNone(load_dotenv(missing))
+
     def test_missing_package_gives_install_hint(self):
         with patch(
             "agent_learning.tool_calling_agent.importlib.util.find_spec",

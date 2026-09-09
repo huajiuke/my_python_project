@@ -13,9 +13,48 @@ import importlib.util
 import json
 import os
 import sys
+from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Protocol
+
+
+def load_dotenv(dotenv_path: Path | None = None) -> Path | None:
+    """加载 .env 文件中的配置到当前进程环境变量。
+
+    不依赖 python-dotenv，按简单 KEY=VALUE 格式解析：
+    - 跳过空行和 # 开头的注释
+    - 兼容 export KEY=VALUE 前缀
+    - 兼容单引号或双引号包裹的值
+    - 已存在的系统环境变量优先级更高，不会被 .env 覆盖
+    """
+    if dotenv_path is not None:
+        candidates = (dotenv_path,)
+    else:
+        script_dir = Path(__file__).resolve().parent
+        repo_root = script_dir.parent
+        candidates = (
+            Path.cwd() / ".env",
+            script_dir / ".env",
+            repo_root / ".env",
+        )
+
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        for raw_line in candidate.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[len("export ") :]
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip("'\"").strip()
+            if key and key not in os.environ:
+                os.environ[key] = value
+        return candidate
+    return None
 
 
 # ---------- 1. 消息与工具定义 ----------
@@ -149,6 +188,7 @@ class OpenAICompatibleLLM:
         base_url: str | None = None,
         model: str | None = None,
     ) -> None:
+        load_dotenv()
         self._ensure_openai_package()
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:

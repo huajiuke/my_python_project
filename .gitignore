@@ -4,5 +4,7 @@
 .idea/
 .venv/
 venv/
+.env
+.env.local
 tasks.json
 *.db
