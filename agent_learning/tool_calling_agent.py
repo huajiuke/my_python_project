@@ -376,7 +376,7 @@ def main() -> None:
         llm = MockLLM(script)
 
     agent = Agent(llm=llm, tools=registry)
-    answer = agent.run("北京天气怎么样？")
+    answer = agent.run("你好")
     print(f"\n最终回答: {answer}")
 
 
