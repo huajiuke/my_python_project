@@ -459,7 +459,65 @@ def get_server_status() -> str:
     return "服务器状态：正常，CPU 25%，内存 60%"
 
 
-def build_demo_registry() -> ToolRegistry:
+def _is_relative_to(path: Path, root: Path) -> bool:
+    '''Return whether a resolved path stays inside an allowed root.'''
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _read_text_file(
+    path: str,
+    max_chars: int,
+    file_roots: dict[str, Path],
+) -> str:
+    '''Read a bounded text file from one of the configured virtual roots.'''
+    if not path or Path(path).is_absolute():
+        raise ValueError('只允许使用 docs/ 或 obsidian/ 开头的相对路径')
+    if max_chars < 1 or max_chars > 20000:
+        raise ValueError('max_chars 必须在 1 到 20000 之间')
+
+    parts = Path(path).parts
+    if len(parts) < 2 or parts[0] not in file_roots:
+        allowed = ', '.join(sorted(file_roots))
+        raise ValueError(f'路径必须以 {allowed} 开头')
+
+    root = file_roots[parts[0]].resolve()
+    candidate = root.joinpath(*parts[1:]).resolve()
+    if not _is_relative_to(candidate, root):
+        raise ValueError('拒绝访问允许目录之外的路径')
+    if candidate.suffix.lower() not in {'.md', '.txt'}:
+        raise ValueError('只允许读取 .md 或 .txt 文件')
+    if not candidate.is_file():
+        raise ValueError(f'文件不存在: {path}')
+
+    with candidate.open('r', encoding='utf-8', errors='replace') as file:
+        content = file.read(max_chars + 1)
+
+    if len(content) > max_chars:
+        return content[:max_chars] + '\n\n[内容已截断]'
+    return content
+
+
+def build_demo_registry(
+    file_roots: dict[str, Path] | None = None,
+) -> ToolRegistry:
+    project_root = Path(__file__).resolve().parent.parent
+    roots = file_roots or {
+        'docs': project_root / 'docs',
+        'obsidian': project_root / 'obsidian',
+    }
+    resolved_roots = {
+        prefix: Path(root).resolve()
+        for prefix, root in roots.items()
+    }
+
+    def read_text_file(path: str, max_chars: int = 4000) -> str:
+        '''Read a file without allowing the model to escape allowed roots.'''
+        return _read_text_file(path, max_chars, resolved_roots)
+
     registry = ToolRegistry()
     registry.register(
         Tool(
@@ -491,6 +549,29 @@ def build_demo_registry() -> ToolRegistry:
             handler=get_server_status,
         )
     )
+    registry.register(
+        Tool(
+            name='read_text_file',
+            description='读取 docs 或 obsidian 目录下的 Markdown/文本文件',
+            parameters={
+                'type': 'object',
+                'properties': {
+                    'path': {
+                        'type': 'string',
+                        'description': '相对路径，例如 docs/fastapi.md',
+                    },
+                    'max_chars': {
+                        'type': 'integer',
+                        'minimum': 1,
+                        'maximum': 20000,
+                        'description': '最多返回的字符数，默认 4000',
+                    },
+                },
+                'required': ['path'],
+            },
+            handler=read_text_file,
+        )
+    )
     return registry
 
 
@@ -509,8 +590,13 @@ def main() -> None:
         ]
         llm = MockLLM(script)
 
+    prompt_args = [
+        arg for arg in sys.argv[1:]
+        if not arg.startswith("--")
+    ]
+    user_input = prompt_args[0] if prompt_args else "你好"
     agent = Agent(llm=llm, tools=registry)
-    answer = agent.run("你好")
+    answer = agent.run(user_input)
     print(f"\n最终回答: {answer}")
 
 

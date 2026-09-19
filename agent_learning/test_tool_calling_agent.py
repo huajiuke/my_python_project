@@ -27,12 +27,14 @@ DOTENV_FIXTURE = (
     / "test.env"
 )
 
+NOTE_ROOT = Path(__file__).resolve().parent / "fixtures" / "note_root"
+
 
 class ToolRegistryTest(unittest.TestCase):
     def test_schemas_contain_function_metadata(self):
         registry = build_demo_registry()
         schemas = registry.schemas()
-        self.assertEqual(len(schemas), 3)
+        self.assertEqual(len(schemas), 4)
 
         weather = schemas[0]["function"]
         self.assertEqual(weather["name"], "get_weather")
@@ -41,6 +43,7 @@ class ToolRegistryTest(unittest.TestCase):
 
         schema_names = [schema["function"]["name"] for schema in schemas]
         self.assertIn("get_server_status", schema_names)
+        self.assertIn("read_text_file", schema_names)
 
     def test_call_unknown_tool_returns_error_observation(self):
         registry = build_demo_registry()
@@ -137,6 +140,47 @@ class ToolRegistryTest(unittest.TestCase):
         self.assertIn("执行超时", result)
         self.assertIn("attempts", result)
 
+    def test_read_text_file_reads_allowed_file(self):
+        registry = build_demo_registry(file_roots={'docs': NOTE_ROOT})
+
+        result = registry.call(
+            'read_text_file',
+            {'path': 'docs/sqlalchemy.md'},
+        )
+
+        self.assertIn('SQLAlchemy', result)
+
+    def test_read_text_file_rejects_path_escape(self):
+        registry = build_demo_registry(file_roots={'docs': NOTE_ROOT})
+
+        result = registry.call(
+            'read_text_file',
+            {'path': 'docs/../secret.txt'},
+        )
+
+        self.assertIn('拒绝访问', result)
+
+    def test_read_text_file_rejects_unsupported_suffix(self):
+        registry = build_demo_registry(file_roots={'docs': NOTE_ROOT})
+
+        result = registry.call(
+            'read_text_file',
+            {'path': 'docs/note.json'},
+        )
+
+        self.assertIn('只允许读取', result)
+
+    def test_read_text_file_truncates_long_content(self):
+        registry = build_demo_registry(file_roots={'docs': NOTE_ROOT})
+
+        result = registry.call(
+            'read_text_file',
+            {'path': 'docs/sqlalchemy.md', 'max_chars': 3},
+        )
+
+        self.assertIn('# S', result)
+        self.assertIn('内容已截断', result)
+
 
 class AgentLoopTest(unittest.TestCase):
     def test_direct_answer_without_tool(self):
@@ -144,7 +188,7 @@ class AgentLoopTest(unittest.TestCase):
         agent = Agent(llm=llm, tools=build_demo_registry(), verbose=False)
 
         self.assertEqual(agent.run("你好"), "你好，我不用工具。")
-        self.assertEqual(len(llm.seen_tools[0]), 3)
+        self.assertEqual(len(llm.seen_tools[0]), 4)
 
     def test_tool_call_then_final_answer(self):
         llm = MockLLM(
