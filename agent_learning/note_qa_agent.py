@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -50,6 +50,8 @@ class NoteQAAgent:
 
     searcher: NoteSearcher
     llm: LLM
+    history: list[dict[str, str]] = field(default_factory=list)
+    max_history_rounds: int = 5
 
     @staticmethod
     def _short_source(source: str) -> str:
@@ -87,12 +89,13 @@ class NoteQAAgent:
                 sources.append(line)
         return "\n".join("来源：" + source for source in sources)
 
-    def answer(self, question: str) -> str:
-        """回答一个自然语言问题，并强制附上实际检索来源。"""
-        results = self.searcher.search(question)
-        if not results:
-            return "本地笔记中没有找到与这个问题相关的内容，请换一种问法或补充笔记。"
-
+    def _answer_with_context(
+        self,
+        question: str,
+        results: list[dict[str, str]],
+        history_messages: list[dict[str, str]],
+    ) -> str:
+        """把检索片段和历史对话一起发给 LLM，返回原始模型回答。"""
         context = self._format_context(results)
         messages: list[dict[str, object]] = [
             {
@@ -103,6 +106,7 @@ class NoteQAAgent:
                     "笔记不足时明确说明。回答应简洁、结构化，适合面试复习。"
                 ),
             },
+            *history_messages,
             {
                 "role": "user",
                 "content": f"## 本地笔记片段\n\n{context}\n\n## 问题\n{question}",
@@ -112,8 +116,50 @@ class NoteQAAgent:
         assistant_msg = self.llm.decide(messages, [])
         answer = assistant_msg.get("content")
         if not isinstance(answer, str) or not answer.strip():
-            answer = "模型未能生成有效回答，请重试。"
+            return "模型未能生成有效回答，请重试。"
+        return answer
 
+    def _remember(self, question: str, answer_text: str) -> None:
+        """把一轮问答写入历史，并限制保留最近若干轮。"""
+        self.history.extend(
+            [
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": answer_text},
+            ]
+        )
+        limit = self.max_history_rounds * 2
+        self.history = self.history[-limit:]
+
+    def _last_history_messages(self) -> list[dict[str, str]]:
+        """返回最近若干轮历史，用于多轮追问时保持上下文。"""
+        limit = self.max_history_rounds * 2
+        return self.history[-limit:]
+
+    def answer(self, question: str) -> str:
+        """单轮回答，不修改历史；适合一次性调用和单元测试。"""
+        results = self.searcher.search(question)
+        if not results:
+            return "本地笔记中没有找到与这个问题相关的内容，请换一种问法或补充笔记。"
+        answer = self._answer_with_context(question, results, [])
+        return f"{answer}\n\n{self._source_footer(results)}"
+
+    def ask(self, question: str) -> str:
+        """多轮问答入口：保存历史，并在下一轮把历史交给 LLM。"""
+        results = self.searcher.search(question)
+        if not results:
+            message = (
+                "本地笔记中没有找到与这个问题相关的内容，请换一种问法或补充笔记。"
+            )
+            self._remember(question, message)
+            return message
+
+        history_messages = self._last_history_messages()
+        answer = self._answer_with_context(
+            question,
+            results,
+            history_messages,
+        )
+        self._remember(question, answer)
         return f"{answer}\n\n{self._source_footer(results)}"
 
 
@@ -138,7 +184,7 @@ def main() -> None:
             question = input("> ").strip()
             if question.lower() in {"exit", "quit"}:
                 break
-            print(agent.answer(question))
+            print(agent.ask(question))
             print()
         return
 
