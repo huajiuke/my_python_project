@@ -2,6 +2,8 @@
 
 import unittest
 import io
+import json
+import logging
 import os
 import time
 from contextlib import redirect_stdout
@@ -13,6 +15,7 @@ from agent_learning.tool_calling_agent import (
     Agent,
     MockLLM,
     OpenAICompatibleLLM,
+    StructuredAgentLogger,
     Tool,
     ToolRegistry,
     build_demo_registry,
@@ -180,6 +183,112 @@ class ToolRegistryTest(unittest.TestCase):
 
         self.assertIn('# S', result)
         self.assertIn('内容已截断', result)
+
+
+class StructuredAgentLoggerTest(unittest.TestCase):
+    def test_agent_emits_ordered_trace_events(self):
+        logger = logging.getLogger("test_agent_trace")
+        trace = StructuredAgentLogger(
+            logger=logger,
+            run_id="run-1",
+            max_content_chars=100,
+        )
+        llm = MockLLM(
+            [
+                {
+                    "type": "tool_call",
+                    "name": "get_weather",
+                    "arguments": {"city": "北京"},
+                },
+                {"type": "final", "content": "北京今天晴。"},
+            ]
+        )
+        agent = Agent(
+            llm=llm,
+            tools=build_demo_registry(),
+            verbose=False,
+            trace=trace,
+        )
+
+        with self.assertLogs(logger, level="INFO") as captured:
+            result = agent.run("北京天气怎么样？")
+
+        self.assertEqual(result, "北京今天晴。")
+        events = [
+            json.loads(record.getMessage())
+            for record in captured.records
+        ]
+        self.assertEqual(
+            [event["event"] for event in events],
+            [
+                "agent_started",
+                "llm_call_started",
+                "llm_call_completed",
+                "tool_call_started",
+                "tool_call_completed",
+                "llm_call_started",
+                "llm_call_completed",
+                "agent_final_answer",
+            ],
+        )
+        self.assertEqual(events[4]["status"], "ok")
+        self.assertGreaterEqual(events[4]["duration_ms"], 0)
+        self.assertEqual(events[-1]["run_id"], "run-1")
+
+    def test_structured_logger_redacts_and_truncates(self):
+        logger = logging.getLogger("test_agent_trace_redaction")
+        trace = StructuredAgentLogger(
+            logger=logger,
+            run_id="run-2",
+            max_content_chars=10,
+        )
+
+        with self.assertLogs(logger, level="INFO") as captured:
+            trace.emit(
+                "probe",
+                arguments={
+                    "api_key": "secret-value",
+                    "query": "x" * 20,
+                    "nested": {"password": "hidden"},
+                },
+            )
+
+        payload = json.loads(captured.records[0].getMessage())
+        self.assertEqual(
+            payload["arguments"]["api_key"],
+            "[REDACTED]",
+        )
+        self.assertEqual(
+            payload["arguments"]["nested"]["password"],
+            "[REDACTED]",
+        )
+        self.assertTrue(
+            payload["arguments"]["query"].endswith("...[truncated]")
+        )
+
+    def test_max_steps_is_traced(self):
+        logger = logging.getLogger("test_agent_trace_max_steps")
+        trace = StructuredAgentLogger(logger=logger, run_id="run-3")
+        llm = MockLLM(
+            [{"type": "tool_call", "name": "get_current_time", "arguments": {}}]
+        )
+        agent = Agent(
+            llm=llm,
+            tools=build_demo_registry(),
+            verbose=False,
+            max_steps=1,
+            trace=trace,
+        )
+
+        with self.assertLogs(logger, level="INFO") as captured:
+            agent.run("现在几点？")
+
+        events = [
+            json.loads(record.getMessage())
+            for record in captured.records
+        ]
+        self.assertEqual(events[-1]["event"], "agent_max_steps_reached")
+        self.assertEqual(events[-1]["max_steps"], 1)
 
 
 class AgentLoopTest(unittest.TestCase):

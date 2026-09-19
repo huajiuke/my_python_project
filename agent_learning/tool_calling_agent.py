@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import os
 import sys
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from pathlib import Path
@@ -386,6 +389,65 @@ class OpenAICompatibleLLM:
         )
 
 
+_SENSITIVE_KEY_PARTS = (
+    "api_key",
+    "authorization",
+    "password",
+    "secret",
+    "token",
+)
+
+
+class StructuredAgentLogger:
+    '''Emit one JSON object per Agent event through the standard logger.'''
+
+    def __init__(
+        self,
+        logger: logging.Logger | None = None,
+        run_id: str | None = None,
+        max_content_chars: int = 500,
+    ) -> None:
+        self.logger = logger or logging.getLogger("agent_learning.agent")
+        self.run_id = run_id or uuid.uuid4().hex
+        self.max_content_chars = max_content_chars
+
+    def _sanitize(self, value: Any, key: str | None = None) -> Any:
+        '''Redact secrets and bound long values before they reach log output.'''
+        if key and any(part in key.lower() for part in _SENSITIVE_KEY_PARTS):
+            return "[REDACTED]"
+        if isinstance(value, str):
+            if len(value) > self.max_content_chars:
+                return value[: self.max_content_chars] + "...[truncated]"
+            return value
+        if isinstance(value, dict):
+            return {
+                str(item_key): self._sanitize(item_value, str(item_key))
+                for item_key, item_value in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [self._sanitize(item) for item in value]
+        return value
+
+    def emit(self, event: str, **fields: Any) -> None:
+        '''Write a stable JSON event that can be filtered by run_id and step.'''
+        payload: dict[str, Any] = {
+            "timestamp": datetime.now().astimezone().isoformat(
+                timespec="milliseconds"
+            ),
+            "event": event,
+            "run_id": self.run_id,
+        }
+        payload.update(
+            {
+                key: self._sanitize(value, key)
+                for key, value in fields.items()
+            }
+        )
+        self.logger.info(
+            json.dumps(payload, ensure_ascii=False, default=str)
+        )
+
+
 # ---------- 4. Agent 循环 ----------
 
 
@@ -396,20 +458,70 @@ class Agent:
     system_prompt: str = "你是一个乐于助人的 AI 助手，需要时使用工具获取信息。"
     max_steps: int = 5
     verbose: bool = True
+    trace: StructuredAgentLogger | None = None
+
+    @staticmethod
+    def _observation_trace_fields(observation: str) -> dict[str, Any]:
+        '''Extract status fields from a tool Observation for structured logs.'''
+        fields: dict[str, Any] = {"observation": observation}
+        try:
+            payload = json.loads(observation)
+        except (TypeError, json.JSONDecodeError):
+            return fields
+
+        if not isinstance(payload, dict):
+            return fields
+        fields["status"] = "error" if "error" in payload else "ok"
+        if "error" in payload:
+            fields["error"] = payload["error"]
+        if "attempts" in payload:
+            fields["attempts"] = payload["attempts"]
+        return fields
 
     def run(self, user_input: str) -> str:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": user_input},
         ]
+        run_started = time.perf_counter()
+        if self.trace:
+            self.trace.emit(
+                "agent_started",
+                user_input=user_input,
+                max_steps=self.max_steps,
+            )
 
         for step in range(1, self.max_steps + 1):
+            llm_started = time.perf_counter()
+            if self.trace:
+                self.trace.emit("llm_call_started", step=step)
             assistant_msg = self.llm.decide(messages, self.tools.schemas())
+            if self.trace:
+                self.trace.emit(
+                    "llm_call_completed",
+                    step=step,
+                    duration_ms=round(
+                        (time.perf_counter() - llm_started) * 1000,
+                        3,
+                    ),
+                    tool_call_count=len(assistant_msg.get("tool_calls") or []),
+                )
 
             if not assistant_msg.get("tool_calls"):
                 if self.verbose:
                     print(f"[Agent] 第 {step} 步：LLM 给出最终回答")
-                return assistant_msg["content"]
+                answer = assistant_msg["content"]
+                if self.trace:
+                    self.trace.emit(
+                        "agent_final_answer",
+                        step=step,
+                        answer=answer,
+                        duration_ms=round(
+                            (time.perf_counter() - run_started) * 1000,
+                            3,
+                        ),
+                    )
+                return answer
 
             messages.append(assistant_msg)
             for call in assistant_msg["tool_calls"]:
@@ -421,7 +533,28 @@ class Agent:
                         f"参数 {arguments}"
                     )
 
+                tool_started = time.perf_counter()
+                if self.trace:
+                    self.trace.emit(
+                        "tool_call_started",
+                        step=step,
+                        tool=name,
+                        arguments=arguments,
+                    )
                 observation = self.tools.call(name, arguments)
+                if self.trace:
+                    trace_fields = self._observation_trace_fields(observation)
+                    self.trace.emit(
+                        "tool_call_completed",
+                        step=step,
+                        tool=name,
+                        arguments=arguments,
+                        duration_ms=round(
+                            (time.perf_counter() - tool_started) * 1000,
+                            3,
+                        ),
+                        **trace_fields,
+                    )
                 messages.append(
                     {
                         "role": "tool",
@@ -432,6 +565,15 @@ class Agent:
                 if self.verbose:
                     print(f"[Agent] 工具返回: {observation}")
 
+        if self.trace:
+            self.trace.emit(
+                "agent_max_steps_reached",
+                max_steps=self.max_steps,
+                duration_ms=round(
+                    (time.perf_counter() - run_started) * 1000,
+                    3,
+                ),
+            )
         if self.verbose:
             print(f"[Agent] 达到最大步数 {self.max_steps}，任务未完成")
         return f"已达到最大步数 {self.max_steps}，任务未完成，请补充信息后重试。"
@@ -577,6 +719,11 @@ def build_demo_registry(
 
 def main() -> None:
     registry = build_demo_registry()
+    trace = None
+    if "--trace-logs" in sys.argv[1:]:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        trace = StructuredAgentLogger()
+
     if "--real" in sys.argv[1:]:
         # 切换到真实 LLM：python agent_learning/tool_calling_agent.py --real
         llm = OpenAICompatibleLLM(
@@ -595,7 +742,7 @@ def main() -> None:
         if not arg.startswith("--")
     ]
     user_input = prompt_args[0] if prompt_args else "你好"
-    agent = Agent(llm=llm, tools=registry)
+    agent = Agent(llm=llm, tools=registry, trace=trace)
     answer = agent.run(user_input)
     print(f"\n最终回答: {answer}")
 

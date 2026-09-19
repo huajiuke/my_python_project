@@ -75,6 +75,12 @@ python agent_learning/tool_calling_agent.py --real "现在几点？"
 python agent_learning/tool_calling_agent.py --real "读取 docs/knowledge_ai_agent.md 的前 500 个字符"
 ```
 
+输出结构化 JSON 事件，用于查看每一步的模型决策、工具状态和耗时：
+
+```powershell
+python agent_learning/tool_calling_agent.py --trace-logs
+```
+
  没有配置 API Key 时仍可运行默认的 Mock 演示，方便先理解循环本身。
 
 ## 工具运行策略
@@ -90,5 +96,5 @@ python agent_learning/tool_calling_agent.py --real "读取 docs/knowledge_ai_age
 2. 已完成：通过 `--debug-tool-arguments` 观察 `tool_calls.arguments` 的 JSON 字符串到 dict 转换
 3. 已完成：工具支持只读 / 可写权限，默认阻止写操作
 4. 已完成：工具支持超时与重试，错误会回填给 LLM
-5. 增加结构化日志，记录每一步的模型决策、工具调用和耗时
+5. 已完成：结构化日志记录 Agent、LLM、工具调用、状态和耗时，并自动脱敏
 6. 为工具调用增加请求级权限上下文，而不是只使用全局开关
