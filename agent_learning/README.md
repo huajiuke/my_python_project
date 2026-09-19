@@ -81,6 +81,16 @@ python agent_learning/tool_calling_agent.py --real "读取 docs/knowledge_ai_age
 python agent_learning/tool_calling_agent.py --trace-logs
 ```
 
+每次运行可以单独限制工具白名单和写权限：
+
+```python
+context = RunContext(
+    allowed_tools=frozenset({"get_current_time", "read_text_file"}),
+    allow_write_tools=False,
+)
+answer = agent.run("现在几点？", context=context)
+```
+
  没有配置 API Key 时仍可运行默认的 Mock 演示，方便先理解循环本身。
 
 ## 工具运行策略
@@ -97,4 +107,4 @@ python agent_learning/tool_calling_agent.py --trace-logs
 3. 已完成：工具支持只读 / 可写权限，默认阻止写操作
 4. 已完成：工具支持超时与重试，错误会回填给 LLM
 5. 已完成：结构化日志记录 Agent、LLM、工具调用、状态和耗时，并自动脱敏
-6. 为工具调用增加请求级权限上下文，而不是只使用全局开关
+6. 已完成：通过 `RunContext` 给每次请求独立设置工具白名单和写权限

@@ -15,6 +15,7 @@ from agent_learning.tool_calling_agent import (
     Agent,
     MockLLM,
     OpenAICompatibleLLM,
+    RunContext,
     StructuredAgentLogger,
     Tool,
     ToolRegistry,
@@ -96,6 +97,47 @@ class ToolRegistryTest(unittest.TestCase):
         result = registry.call("write_file", {})
 
         self.assertIn("written", result)
+
+    def test_request_context_can_allow_write_tool(self):
+        registry = ToolRegistry()
+        registry.register(
+            Tool(
+                name="write_file",
+                description="write a file",
+                parameters={"type": "object", "properties": {}},
+                handler=lambda: "written",
+                read_only=False,
+            )
+        )
+        context = RunContext(allow_write_tools=True)
+
+        result = registry.call("write_file", {}, context=context)
+
+        self.assertIn("written", result)
+
+    def test_request_context_allowlist_blocks_unlisted_tool(self):
+        registry = build_demo_registry()
+        context = RunContext(
+            allowed_tools=frozenset({"get_current_time"})
+        )
+
+        result = registry.call("get_weather", {}, context=context)
+
+        self.assertIn("不在当前请求允许列表", result)
+
+    def test_schemas_follow_request_context(self):
+        registry = build_demo_registry()
+        context = RunContext(
+            allowed_tools=frozenset({"get_current_time"})
+        )
+
+        schemas = registry.schemas(context)
+
+        self.assertEqual(len(schemas), 1)
+        self.assertEqual(
+            schemas[0]["function"]["name"],
+            "get_current_time",
+        )
 
     def test_transient_tool_failure_is_retried(self):
         attempts: list[int] = []
@@ -298,6 +340,41 @@ class AgentLoopTest(unittest.TestCase):
 
         self.assertEqual(agent.run("你好"), "你好，我不用工具。")
         self.assertEqual(len(llm.seen_tools[0]), 4)
+
+    def test_agent_run_context_limits_schemas_and_calls(self):
+        llm = MockLLM(
+            [
+                {
+                    "type": "tool_call",
+                    "name": "get_weather",
+                    "arguments": {"city": "北京"},
+                },
+                {"type": "final", "content": "工具不可用。"},
+            ]
+        )
+        agent = Agent(
+            llm=llm,
+            tools=build_demo_registry(),
+            verbose=False,
+        )
+        context = RunContext(
+            allowed_tools=frozenset({"get_current_time"})
+        )
+
+        result = agent.run("北京天气怎么样？", context=context)
+
+        self.assertEqual(result, "工具不可用。")
+        visible_tools = [
+            schema["function"]["name"]
+            for schema in llm.seen_tools[0]
+        ]
+        self.assertEqual(visible_tools, ["get_current_time"])
+        observation = [
+            message
+            for message in llm.seen_messages[1]
+            if message["role"] == "tool"
+        ][0]
+        self.assertIn("不在当前请求允许列表", observation["content"])
 
     def test_tool_call_then_final_answer(self):
         llm = MockLLM(

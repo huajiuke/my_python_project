@@ -87,6 +87,14 @@ class Tool:
             raise ValueError('timeout_seconds must be positive or None')
 
 
+@dataclass(frozen=True)
+class RunContext:
+    '''Per-run tool permissions passed to schemas and tool execution.'''
+
+    allowed_tools: frozenset[str] | None = None
+    allow_write_tools: bool = False
+
+
 class LLM(Protocol):
     """LLM 适配层：输入消息和工具列表，返回 assistant 消息。"""
 
@@ -110,7 +118,28 @@ class ToolRegistry:
     def register(self, tool: Tool) -> None:
         self._tools[tool.name] = tool
 
-    def schemas(self) -> list[dict[str, Any]]:
+    def _permission_error(
+        self,
+        tool: Tool,
+        context: RunContext | None,
+    ) -> str | None:
+        '''Return a permission error when the current run cannot use a tool.'''
+        allowed_tools = context.allowed_tools if context else None
+        if allowed_tools is not None and tool.name not in allowed_tools:
+            return f"工具权限不足: {tool.name} 不在当前请求允许列表中"
+
+        allow_write = (
+            context.allow_write_tools if context else self.allow_write_tools
+        )
+        if not tool.read_only and not allow_write:
+            scope = '当前请求' if context else '当前 Registry'
+            return f"工具权限不足: {tool.name} 是写操作，{scope}未允许写工具"
+        return None
+
+    def schemas(
+        self,
+        context: RunContext | None = None,
+    ) -> list[dict[str, Any]]:
         """生成 OpenAI 兼容的 tool schema，传给 LLM 决定是否调用。"""
         return [
             {
@@ -122,9 +151,15 @@ class ToolRegistry:
                 },
             }
             for tool in self._tools.values()
+            if self._permission_error(tool, context) is None
         ]
 
-    def call(self, name: str, arguments: dict[str, Any]) -> str:
+    def call(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        context: RunContext | None = None,
+    ) -> str:
         """执行工具并返回字符串 Observation。
 
         错误也返回成 Observation，这样 LLM 能看到失败原因并自我纠正。
@@ -132,13 +167,11 @@ class ToolRegistry:
         tool = self._tools.get(name)
         if tool is None:
             return json.dumps({"error": f"工具不存在: {name}"}, ensure_ascii=False)
-        if not tool.read_only and not self.allow_write_tools:
+        permission_error = self._permission_error(tool, context)
+        if permission_error:
             return json.dumps(
                 {
-                    "error": (
-                        f"工具权限不足: {name} 是写操作，"
-                        "当前 Registry 未允许写工具"
-                    ),
+                    "error": permission_error,
                     "attempts": 0,
                 },
                 ensure_ascii=False,
@@ -478,7 +511,11 @@ class Agent:
             fields["attempts"] = payload["attempts"]
         return fields
 
-    def run(self, user_input: str) -> str:
+    def run(
+        self,
+        user_input: str,
+        context: RunContext | None = None,
+    ) -> str:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": user_input},
@@ -495,7 +532,10 @@ class Agent:
             llm_started = time.perf_counter()
             if self.trace:
                 self.trace.emit("llm_call_started", step=step)
-            assistant_msg = self.llm.decide(messages, self.tools.schemas())
+            assistant_msg = self.llm.decide(
+                messages,
+                self.tools.schemas(context),
+            )
             if self.trace:
                 self.trace.emit(
                     "llm_call_completed",
@@ -541,7 +581,11 @@ class Agent:
                         tool=name,
                         arguments=arguments,
                     )
-                observation = self.tools.call(name, arguments)
+                observation = self.tools.call(
+                    name,
+                    arguments,
+                    context=context,
+                )
                 if self.trace:
                     trace_fields = self._observation_trace_fields(observation)
                     self.trace.emit(
