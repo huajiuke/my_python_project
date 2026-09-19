@@ -13,6 +13,8 @@ import importlib.util
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -64,10 +66,22 @@ ToolHandler = Callable[..., str]
 
 @dataclass
 class Tool:
+    """Describe a callable tool and its runtime safety policy."""
+
     name: str
     description: str
     parameters: dict[str, Any]
     handler: ToolHandler
+    read_only: bool = True
+    timeout_seconds: float | None = None
+    max_attempts: int = 1
+
+    def __post_init__(self) -> None:
+        '''Reject invalid policies before the Agent starts running.'''
+        if self.max_attempts < 1:
+            raise ValueError('max_attempts must be at least 1')
+        if self.timeout_seconds is not None and self.timeout_seconds <= 0:
+            raise ValueError('timeout_seconds must be positive or None')
 
 
 class LLM(Protocol):
@@ -85,8 +99,10 @@ class LLM(Protocol):
 
 
 class ToolRegistry:
-    def __init__(self) -> None:
+    def __init__(self, allow_write_tools: bool = False) -> None:
+        # Write tools are opt-in because the model must not mutate state by default.
         self._tools: dict[str, Tool] = {}
+        self.allow_write_tools = allow_write_tools
 
     def register(self, tool: Tool) -> None:
         self._tools[tool.name] = tool
@@ -113,13 +129,67 @@ class ToolRegistry:
         tool = self._tools.get(name)
         if tool is None:
             return json.dumps({"error": f"工具不存在: {name}"}, ensure_ascii=False)
+        if not tool.read_only and not self.allow_write_tools:
+            return json.dumps(
+                {
+                    "error": (
+                        f"工具权限不足: {name} 是写操作，"
+                        "当前 Registry 未允许写工具"
+                    ),
+                    "attempts": 0,
+                },
+                ensure_ascii=False,
+            )
+
+        last_error = ""
+        for attempt in range(1, tool.max_attempts + 1):
+            try:
+                result = self._call_handler(tool, arguments)
+                return json.dumps({"result": result}, ensure_ascii=False)
+            except TypeError as exc:
+                # 参数错误无法通过原样重试恢复，立即返回给 LLM 修正。
+                return json.dumps(
+                    {"error": f"参数错误: {exc}", "attempts": attempt},
+                    ensure_ascii=False,
+                )
+            except FutureTimeoutError:
+                last_error = (
+                    f"执行超时: {name} 超过 {tool.timeout_seconds} 秒"
+                )
+            except Exception as exc:
+                last_error = f"执行失败: {exc}"
+
+            if attempt < tool.max_attempts:
+                continue
+
+        return json.dumps(
+            {"error": last_error, "attempts": tool.max_attempts},
+            ensure_ascii=False,
+        )
+
+    @staticmethod
+    def _call_handler(tool: Tool, arguments: dict[str, Any]) -> str:
+        """Execute a sync tool with an optional timeout guard.
+
+        A Python thread cannot be force-killed safely, so a timed-out handler
+        may continue briefly in the background. Production systems should use
+        process isolation or a cancellation protocol for long-running work.
+        """
+        if tool.timeout_seconds is None:
+            return tool.handler(**arguments)
+
+        executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix=f"tool-{tool.name}",
+        )
+        future = executor.submit(tool.handler, **arguments)
         try:
-            result = tool.handler(**arguments)
-            return json.dumps({"result": result}, ensure_ascii=False)
-        except TypeError as exc:
-            return json.dumps({"error": f"参数错误: {exc}"}, ensure_ascii=False)
-        except Exception as exc:
-            return json.dumps({"error": f"执行失败: {exc}"}, ensure_ascii=False)
+            return future.result(timeout=tool.timeout_seconds)
+        except FutureTimeoutError:
+            future.cancel()
+            raise
+        finally:
+            executor.shutdown(wait=False)
 
 
 # ---------- 3. Mock LLM ----------

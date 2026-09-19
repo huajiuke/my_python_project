@@ -2,6 +2,7 @@
 
 import unittest
 import os
+import time
 from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
@@ -10,6 +11,8 @@ from agent_learning.tool_calling_agent import (
     Agent,
     MockLLM,
     OpenAICompatibleLLM,
+    Tool,
+    ToolRegistry,
     build_demo_registry,
     load_dotenv,
 )
@@ -52,6 +55,85 @@ class ToolRegistryTest(unittest.TestCase):
         result = registry.call("get_server_status", {})
         self.assertIn("服务器状态", result)
         self.assertIn("CPU", result)
+
+    def test_write_tool_is_blocked_by_default(self):
+        registry = ToolRegistry()
+        registry.register(
+            Tool(
+                name="write_file",
+                description="write a file",
+                parameters={"type": "object", "properties": {}},
+                handler=lambda: "written",
+                read_only=False,
+            )
+        )
+
+        result = registry.call("write_file", {})
+
+        self.assertIn("权限不足", result)
+        self.assertIn("attempts", result)
+
+    def test_write_tool_runs_when_explicitly_allowed(self):
+        registry = ToolRegistry(allow_write_tools=True)
+        registry.register(
+            Tool(
+                name="write_file",
+                description="write a file",
+                parameters={"type": "object", "properties": {}},
+                handler=lambda: "written",
+                read_only=False,
+            )
+        )
+
+        result = registry.call("write_file", {})
+
+        self.assertIn("written", result)
+
+    def test_transient_tool_failure_is_retried(self):
+        attempts: list[int] = []
+
+        def flaky_tool() -> str:
+            attempts.append(1)
+            if len(attempts) < 3:
+                raise RuntimeError("temporary failure")
+            return "recovered"
+
+        registry = ToolRegistry()
+        registry.register(
+            Tool(
+                name="flaky",
+                description="fail twice then recover",
+                parameters={"type": "object", "properties": {}},
+                handler=flaky_tool,
+                max_attempts=3,
+            )
+        )
+
+        result = registry.call("flaky", {})
+
+        self.assertIn("recovered", result)
+        self.assertEqual(len(attempts), 3)
+
+    def test_tool_timeout_returns_error_observation(self):
+        def slow_tool() -> str:
+            time.sleep(0.05)
+            return "too late"
+
+        registry = ToolRegistry()
+        registry.register(
+            Tool(
+                name="slow",
+                description="sleep past the timeout",
+                parameters={"type": "object", "properties": {}},
+                handler=slow_tool,
+                timeout_seconds=0.001,
+            )
+        )
+
+        result = registry.call("slow", {})
+
+        self.assertIn("执行超时", result)
+        self.assertIn("attempts", result)
 
 
 class AgentLoopTest(unittest.TestCase):
