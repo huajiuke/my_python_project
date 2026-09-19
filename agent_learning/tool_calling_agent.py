@@ -257,6 +257,7 @@ class OpenAICompatibleLLM:
         api_key: str | None = None,
         base_url: str | None = None,
         model: str | None = None,
+        debug_tool_arguments: bool = False,
     ) -> None:
         load_dotenv()
         self._ensure_openai_package()
@@ -271,6 +272,8 @@ class OpenAICompatibleLLM:
             base_url=base_url or os.getenv("OPENAI_BASE_URL"),
         )
         self.model = model or os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
+        # Enables a small teaching trace for the JSON string -> dict boundary.
+        self.debug_tool_arguments = debug_tool_arguments
 
     @staticmethod
     def _ensure_openai_package() -> None:
@@ -310,7 +313,10 @@ class OpenAICompatibleLLM:
         return normalized
 
     @staticmethod
-    def _assistant_from_api(message: Any) -> dict[str, Any]:
+    def _assistant_from_api(
+        message: Any,
+        debug_tool_arguments: bool = False,
+    ) -> dict[str, Any]:
         """把 OpenAI 返回的 assistant message 转成 Agent 内部消息。
 
         这里统一把 arguments 字符串解析成 dict，后续 Agent 执行工具时
@@ -326,6 +332,12 @@ class OpenAICompatibleLLM:
         parsed_calls = []
         for call in tool_calls:
             raw_arguments = call.function.arguments
+            if debug_tool_arguments:
+                print(
+                    "[ToolArguments] before: "
+                    f"type={type(raw_arguments).__name__}, "
+                    f"value={raw_arguments!r}"
+                )
             if isinstance(raw_arguments, str):
                 try:
                     arguments = json.loads(raw_arguments)
@@ -333,6 +345,13 @@ class OpenAICompatibleLLM:
                     arguments = {}
             else:
                 arguments = raw_arguments
+
+            if debug_tool_arguments:
+                print(
+                    "[ToolArguments] after: "
+                    f"type={type(arguments).__name__}, "
+                    f"value={arguments!r}"
+                )
 
             parsed_calls.append(
                 {
@@ -361,7 +380,10 @@ class OpenAICompatibleLLM:
             messages=self._messages_for_api(messages),
             tools=tools or None,
         )
-        return self._assistant_from_api(response.choices[0].message)
+        return self._assistant_from_api(
+            response.choices[0].message,
+            debug_tool_arguments=self.debug_tool_arguments,
+        )
 
 
 # ---------- 4. Agent 循环 ----------
@@ -476,7 +498,9 @@ def main() -> None:
     registry = build_demo_registry()
     if "--real" in sys.argv[1:]:
         # 切换到真实 LLM：python agent_learning/tool_calling_agent.py --real
-        llm = OpenAICompatibleLLM()
+        llm = OpenAICompatibleLLM(
+            debug_tool_arguments="--debug-tool-arguments" in sys.argv[1:]
+        )
     else:
         # 默认离线演示，不需要 API key，适合理解 Agent 循环。
         script = [

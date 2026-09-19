@@ -1,8 +1,10 @@
 """Tool Calling Agent 核心循环测试。"""
 
 import unittest
+import io
 import os
 import time
+from contextlib import redirect_stdout
 from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
@@ -276,6 +278,30 @@ class OpenAICompatibleLLMTest(unittest.TestCase):
             result["tool_calls"][0]["function"]["arguments"],
             {"city": "北京"},
         )
+
+    def test_assistant_from_api_can_debug_argument_conversion(self):
+        tool_call = SimpleNamespace(
+            id="call_1",
+            type="function",
+            function=SimpleNamespace(
+                name="get_weather",
+                arguments='{"city": "上海"}',
+            ),
+        )
+        api_message = SimpleNamespace(content=None, tool_calls=[tool_call])
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            OpenAICompatibleLLM._assistant_from_api(
+                api_message,
+                debug_tool_arguments=True,
+            )
+
+        trace = output.getvalue()
+        self.assertIn("[ToolArguments] before", trace)
+        self.assertIn("type=str", trace)
+        self.assertIn("[ToolArguments] after", trace)
+        self.assertIn("type=dict", trace)
 
     def test_assistant_from_api_keeps_direct_answer(self):
         api_message = SimpleNamespace(content="你好", tool_calls=None)

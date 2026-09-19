@@ -58,9 +58,15 @@
 
  用真实模型运行：
 
- ```powershell
- python agent_learning/tool_calling_agent.py --real
- ```
+```powershell
+python agent_learning/tool_calling_agent.py --real
+```
+
+观察真实模型返回的工具参数如何在 JSON 字符串和 Python dict 之间转换：
+
+```powershell
+python agent_learning/tool_calling_agent.py --real --debug-tool-arguments
+```
 
  没有配置 API Key 时仍可运行默认的 Mock 演示，方便先理解循环本身。
 
@@ -74,7 +80,7 @@
 ## 扩展任务
 
  1. 增加 `get_current_time`、文件读取等工具，观察多工具如何选择
- 2. 观察真实 LLM 返回的 `tool_calls.arguments` 是 JSON 字符串，内部如何被解析成 dict
+2. 已完成：通过 `--debug-tool-arguments` 观察 `tool_calls.arguments` 的 JSON 字符串到 dict 转换
 3. 已完成：工具支持只读 / 可写权限，默认阻止写操作
 4. 已完成：工具支持超时与重试，错误会回填给 LLM
 5. 增加结构化日志，记录每一步的模型决策、工具调用和耗时
