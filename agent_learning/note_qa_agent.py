@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,6 +18,10 @@ from typing import Protocol
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from agent_learning.conversation_memory import (
+    DEFAULT_MEMORY_DB,
+    ConversationMemory,
+)
 from agent_learning.note_search import NoteSearcher
 from agent_learning.tool_calling_agent import (
     MockLLM,
@@ -52,6 +57,18 @@ class NoteQAAgent:
     llm: LLM
     history: list[dict[str, str]] = field(default_factory=list)
     max_history_rounds: int = 5
+    memory: ConversationMemory | None = None
+    session_id: str = "default"
+
+    def __post_init__(self) -> None:
+        """Validate limits and restore recent messages for this session."""
+        if self.max_history_rounds < 1:
+            raise ValueError("max_history_rounds must be at least 1")
+        if self.memory is not None:
+            self.history = self.memory.recent(
+                self.session_id,
+                self.max_history_rounds * 2,
+            )
 
     @staticmethod
     def _short_source(source: str) -> str:
@@ -121,12 +138,13 @@ class NoteQAAgent:
 
     def _remember(self, question: str, answer_text: str) -> None:
         """把一轮问答写入历史，并限制保留最近若干轮。"""
-        self.history.extend(
-            [
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": answer_text},
-            ]
-        )
+        messages = [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer_text},
+        ]
+        if self.memory is not None:
+            self.memory.append_many(self.session_id, messages)
+        self.history.extend(messages)
         limit = self.max_history_rounds * 2
         self.history = self.history[-limit:]
 
@@ -163,12 +181,37 @@ class NoteQAAgent:
         return f"{answer}\n\n{self._source_footer(results)}"
 
 
-def main() -> None:
-    """命令行入口：支持 Mock、真实模型和交互式连续问答。"""
-    load_dotenv()
-    args = sys.argv[1:]
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the CLI without mixing option values into the question list."""
+    parser = argparse.ArgumentParser(description="本地笔记问答 Agent")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--real", action="store_true", help="使用真实模型")
+    mode.add_argument("--mock", action="store_true", help="使用离线 Mock")
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="进入连续问答模式",
+    )
+    parser.add_argument(
+        "--session-id",
+        default="default",
+        help="持久化记忆会话标识",
+    )
+    parser.add_argument(
+        "--memory-db",
+        default=str(DEFAULT_MEMORY_DB),
+        help="SQLite 记忆数据库路径",
+    )
+    parser.add_argument("question", nargs="?", help="单次提问内容")
+    return parser
 
-    if "--mock" in args:
+
+def main() -> None:
+    """命令行入口：支持 Mock、真实模型和持久化连续问答。"""
+    load_dotenv()
+    args = _build_parser().parse_args()
+
+    if args.mock:
         llm = MockLLM(
             [{"type": "final", "content": "Mock 回答：已根据笔记片段给出简要答案。"}]
         )
@@ -176,21 +219,31 @@ def main() -> None:
         # 默认走真实模型；需要 agent_learning/.env 或系统环境变量配置。
         llm = OpenAICompatibleLLM()
 
-    agent = NoteQAAgent(searcher=NoteSearcher(), llm=llm)
+    with ConversationMemory(args.memory_db) as memory:
+        agent = NoteQAAgent(
+            searcher=NoteSearcher(),
+            llm=llm,
+            memory=memory,
+            session_id=args.session_id,
+        )
 
-    if "--interactive" in args:
-        print("输入问题开始，输入 exit 退出。")
-        while True:
-            question = input("> ").strip()
-            if question.lower() in {"exit", "quit"}:
-                break
-            print(agent.ask(question))
-            print()
-        return
+        if args.interactive:
+            print(
+                f"输入问题开始，会话：{args.session_id}，输入 exit 退出。"
+            )
+            while True:
+                question = input("> ").strip()
+                if question.lower() in {"exit", "quit"}:
+                    break
+                print(agent.ask(question))
+                print()
+            return
 
-    questions = [arg for arg in args if not arg.startswith("--")]
-    question = questions[0] if questions else "SQLAlchemy 的 Session 应该怎么管理？"
-    print(agent.answer(question))
+        question = (
+            args.question
+            or "SQLAlchemy 的 Session 应该怎么管理？"
+        )
+        print(agent.ask(question))
 
 
 if __name__ == "__main__":

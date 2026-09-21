@@ -100,6 +100,32 @@ answer = agent.run("现在几点？", context=context)
 - `timeout_seconds` 控制单次执行的等待时间，超时会作为 Observation 返回给 LLM。
 - `max_attempts` 控制最多执行次数，普通异常会重试，参数错误不会做无意义重试。
 
+## 持久化记忆
+
+`NoteQAAgent.ask()` 会把每轮问题、回答按 `session_id` 写入 SQLite。默认数据库是
+`agent_learning/data/conversation_memory.db`，数据库文件已被 `.gitignore` 忽略。
+
+同一个会话跨进程继续追问：
+
+```powershell
+python agent_learning/note_qa_agent.py --mock --session-id interview "SQLAlchemy 的 Session 应该怎么管理？"
+python agent_learning/note_qa_agent.py --mock --session-id interview "那 flush 和 commit 有什么区别？"
+```
+
+交互模式：
+
+```powershell
+python agent_learning/note_qa_agent.py --real --interactive --session-id interview
+```
+
+使用内存数据库可以关闭持久化：
+
+```powershell
+python agent_learning/note_qa_agent.py --mock --memory-db :memory: --session-id temporary "Session 管理"
+```
+
+`NoteQAAgent.answer()` 仍然是无状态单轮调用，不会读取或写入历史。
+
 ## 扩展任务
 
 1. 已完成：增加 `get_current_time` 和受限文件读取工具，支持多工具选择
