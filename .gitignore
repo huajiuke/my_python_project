@@ -10,3 +10,5 @@ tasks.json
 .tools/
 fastapi_learning/react_frontend/node_modules/
 fastapi_learning/react_frontend/dist/
+obsidian/.obsidian/workspace*.json
+obsidian/.obsidian/graph.json
