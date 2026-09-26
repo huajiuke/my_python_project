@@ -22,6 +22,7 @@ from agent_learning.conversation_memory import (
     DEFAULT_MEMORY_DB,
     ConversationMemory,
 )
+from agent_learning.conversation_summarizer import ConversationSummarizer
 from agent_learning.note_search import NoteSearcher
 from agent_learning.tool_calling_agent import (
     MockLLM,
@@ -59,16 +60,56 @@ class NoteQAAgent:
     max_history_rounds: int = 5
     memory: ConversationMemory | None = None
     session_id: str = "default"
+    summarizer: ConversationSummarizer | None = None
+    summary_trigger_rounds: int = 10
+    _summary: str | None = field(default=None, init=False, repr=False)
+    _summary_pointer: int = field(default=0, init=False, repr=False)
+    _unsummarized_history: list[dict[str, str]] = field(
+        default_factory=list,
+        init=False,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         """Validate limits and restore recent messages for this session."""
         if self.max_history_rounds < 1:
             raise ValueError("max_history_rounds must be at least 1")
+        if self.summary_trigger_rounds < 1:
+            raise ValueError("summary_trigger_rounds must be at least 1")
+        if self.summarizer is not None:
+            if self.memory is None:
+                raise ValueError("summarizer requires persistent memory")
+            if self.summary_trigger_rounds < self.max_history_rounds:
+                raise ValueError(
+                    "summary_trigger_rounds must be at least "
+                    "max_history_rounds"
+                )
         if self.memory is not None:
-            self.history = self.memory.recent(
-                self.session_id,
-                self.max_history_rounds * 2,
-            )
+            if self.summarizer is None:
+                self.history = self.memory.recent(
+                    self.session_id,
+                    self.max_history_rounds * 2,
+                )
+            else:
+                summary = self.memory.latest_summary(self.session_id)
+                if summary is not None:
+                    self._summary = summary["summary"]
+                    self._summary_pointer = summary[
+                        "summarized_through_id"
+                    ]
+                self._unsummarized_history = [
+                    {
+                        "role": str(message["role"]),
+                        "content": str(message["content"]),
+                    }
+                    for message in self.memory.messages_after(
+                        self.session_id,
+                        self._summary_pointer,
+                    )
+                ]
+                self.history = self._unsummarized_history[
+                    -(self.max_history_rounds * 2) :
+                ]
 
     @staticmethod
     def _short_source(source: str) -> str:
@@ -111,6 +152,7 @@ class NoteQAAgent:
         question: str,
         results: list[dict[str, str]],
         history_messages: list[dict[str, str]],
+        summary: str | None = None,
     ) -> str:
         """把检索片段和历史对话一起发给 LLM，返回原始模型回答。"""
         context = self._format_context(results)
@@ -123,12 +165,21 @@ class NoteQAAgent:
                     "笔记不足时明确说明。回答应简洁、结构化，适合面试复习。"
                 ),
             },
-            *history_messages,
+        ]
+        if summary:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": f"## 已压缩的历史对话摘要\n{summary}",
+                }
+            )
+        messages.extend(history_messages)
+        messages.append(
             {
                 "role": "user",
                 "content": f"## 本地笔记片段\n\n{context}\n\n## 问题\n{question}",
-            },
-        ]
+            }
+        )
 
         assistant_msg = self.llm.decide(messages, [])
         answer = assistant_msg.get("content")
@@ -144,14 +195,67 @@ class NoteQAAgent:
         ]
         if self.memory is not None:
             self.memory.append_many(self.session_id, messages)
+        if self.summarizer is not None:
+            self._unsummarized_history.extend(messages)
         self.history.extend(messages)
         limit = self.max_history_rounds * 2
         self.history = self.history[-limit:]
 
     def _last_history_messages(self) -> list[dict[str, str]]:
         """返回最近若干轮历史，用于多轮追问时保持上下文。"""
+        if self.summarizer is not None:
+            return list(self._unsummarized_history)
         limit = self.max_history_rounds * 2
         return self.history[-limit:]
+
+    def _maybe_summarize(self) -> None:
+        """Compact old complete rounds while preserving the recent window."""
+        if self.summarizer is None or self.memory is None:
+            return
+
+        try:
+            messages = self.memory.messages_after(
+                self.session_id,
+                self._summary_pointer,
+            )
+            completed_message_count = (len(messages) // 2) * 2
+            completed_rounds = completed_message_count // 2
+            if completed_rounds < self.summary_trigger_rounds:
+                return
+
+            compact_count = (
+                completed_message_count - self.max_history_rounds * 2
+            )
+            if compact_count <= 0:
+                return
+
+            compact_messages = messages[:compact_count]
+            summary = self.summarizer.summarize(
+                self._summary,
+                compact_messages,
+            )
+            pointer = int(compact_messages[-1]["id"])
+            self.memory.save_summary(
+                self.session_id,
+                summary,
+                pointer,
+            )
+            self._summary = summary
+            self._summary_pointer = pointer
+            self._unsummarized_history = [
+                {
+                    "role": str(message["role"]),
+                    "content": str(message["content"]),
+                }
+                for message in self.memory.messages_after(
+                    self.session_id,
+                    pointer,
+                )
+            ]
+        except Exception:
+            # Memory compression is best effort; the answer must still be
+            # returned and the unsummarized window retried on a later turn.
+            return
 
     def answer(self, question: str) -> str:
         """单轮回答，不修改历史；适合一次性调用和单元测试。"""
@@ -169,6 +273,7 @@ class NoteQAAgent:
                 "本地笔记中没有找到与这个问题相关的内容，请换一种问法或补充笔记。"
             )
             self._remember(question, message)
+            self._maybe_summarize()
             return message
 
         history_messages = self._last_history_messages()
@@ -176,8 +281,10 @@ class NoteQAAgent:
             question,
             results,
             history_messages,
+            self._summary,
         )
         self._remember(question, answer)
+        self._maybe_summarize()
         return f"{answer}\n\n{self._source_footer(results)}"
 
 
@@ -202,6 +309,23 @@ def _build_parser() -> argparse.ArgumentParser:
         default=str(DEFAULT_MEMORY_DB),
         help="SQLite 记忆数据库路径",
     )
+    parser.add_argument(
+        "--summarize-memory",
+        action="store_true",
+        help="达到阈值后压缩较早的对话历史",
+    )
+    parser.add_argument(
+        "--summary-trigger-rounds",
+        type=int,
+        default=10,
+        help="未压缩历史达到多少轮后触发摘要",
+    )
+    parser.add_argument(
+        "--recent-history-rounds",
+        type=int,
+        default=5,
+        help="摘要压缩后保留的最近原始对话轮数",
+    )
     parser.add_argument("question", nargs="?", help="单次提问内容")
     return parser
 
@@ -225,6 +349,13 @@ def main() -> None:
             llm=llm,
             memory=memory,
             session_id=args.session_id,
+            max_history_rounds=args.recent_history_rounds,
+            summarizer=(
+                ConversationSummarizer(llm)
+                if args.summarize_memory
+                else None
+            ),
+            summary_trigger_rounds=args.summary_trigger_rounds,
         )
 
         if args.interactive:

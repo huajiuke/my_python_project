@@ -126,6 +126,21 @@ python agent_learning/note_qa_agent.py --mock --memory-db :memory: --session-id 
 
 `NoteQAAgent.answer()` 仍然是无状态单轮调用，不会读取或写入历史。
 
+## 滚动摘要记忆
+
+开启 `--summarize-memory` 后，原始消息仍会永久保存在 SQLite；当未压缩历史
+达到阈值时，Agent 会把较早的完整问答轮压缩成摘要，并在后续请求中组合使用
+“摘要 + 近期原始对话”。默认达到 10 轮触发，最近 5 轮保留原文。
+
+```powershell
+python agent_learning/note_qa_agent.py --real --interactive `
+  --session-id interview --summarize-memory `
+  --summary-trigger-rounds 10 --recent-history-rounds 5
+```
+
+摘要写入同一会话的 `conversation_summaries` 表。若摘要模型临时失败，本轮回答
+仍会正常返回，摘要指针保持不变，未压缩内容会在后续轮次继续尝试压缩。
+
 ## 扩展任务
 
 1. 已完成：增加 `get_current_time` 和受限文件读取工具，支持多工具选择
@@ -134,3 +149,4 @@ python agent_learning/note_qa_agent.py --mock --memory-db :memory: --session-id 
 4. 已完成：工具支持超时与重试，错误会回填给 LLM
 5. 已完成：结构化日志记录 Agent、LLM、工具调用、状态和耗时，并自动脱敏
 6. 已完成：通过 `RunContext` 给每次请求独立设置工具白名单和写权限
+7. 已完成：持久化会话支持滚动摘要压缩，并保留最近原始问答窗口
