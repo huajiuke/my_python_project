@@ -58,6 +58,16 @@ class ConversationMemory:
                 ON conversation_messages (session_id, id)
                 """
             )
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_summaries (
+                    session_id TEXT PRIMARY KEY,
+                    summary TEXT NOT NULL,
+                    summarized_through_id INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
 
     @staticmethod
     def _normalize_session_id(session_id: str) -> str:
@@ -140,10 +150,107 @@ class ConversationMemory:
             for row in rows
         ]
 
+    def messages_after(
+        self,
+        session_id: str,
+        message_id: int,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return messages with ids greater than the summary pointer."""
+        session = self._normalize_session_id(session_id)
+        if message_id < 0:
+            raise ValueError('message_id must not be negative')
+        if limit is not None and limit <= 0:
+            return []
+
+        effective_limit = -1 if limit is None else limit
+        rows = self._connection.execute(
+            """
+            SELECT id, role, content
+            FROM conversation_messages
+            WHERE session_id = ? AND id > ?
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (session, message_id, effective_limit),
+        ).fetchall()
+        return [
+            {
+                'id': int(row['id']),
+                'role': str(row['role']),
+                'content': str(row['content']),
+            }
+            for row in rows
+        ]
+
+    def latest_summary(self, session_id: str) -> dict[str, Any] | None:
+        """Return the rolling summary and the last covered message id."""
+        session = self._normalize_session_id(session_id)
+        row = self._connection.execute(
+            """
+            SELECT summary, summarized_through_id, updated_at
+            FROM conversation_summaries
+            WHERE session_id = ?
+            """,
+            (session,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            'summary': str(row['summary']),
+            'summarized_through_id': int(row['summarized_through_id']),
+            'updated_at': str(row['updated_at']),
+        }
+
+    def save_summary(
+        self,
+        session_id: str,
+        summary: str,
+        summarized_through_id: int,
+    ) -> None:
+        """Create or replace one session's rolling summary."""
+        session = self._normalize_session_id(session_id)
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError('summary must not be empty')
+        if summarized_through_id <= 0:
+            raise ValueError('summarized_through_id must be positive')
+
+        exists = self._connection.execute(
+            """
+            SELECT 1
+            FROM conversation_messages
+            WHERE session_id = ? AND id = ?
+            """,
+            (session, summarized_through_id),
+        ).fetchone()
+        if exists is None:
+            raise ValueError('summary pointer does not belong to this session')
+
+        with self._connection:
+            self._connection.execute(
+                """
+                INSERT INTO conversation_summaries (
+                    session_id,
+                    summary,
+                    summarized_through_id
+                )
+                VALUES (?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    summary = excluded.summary,
+                    summarized_through_id = excluded.summarized_through_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (session, summary.strip(), summarized_through_id),
+            )
+
     def clear(self, session_id: str) -> int:
         """Delete all messages in one session and return the row count."""
         session = self._normalize_session_id(session_id)
         with self._connection:
+            self._connection.execute(
+                'DELETE FROM conversation_summaries WHERE session_id = ?',
+                (session,),
+            )
             cursor = self._connection.execute(
                 'DELETE FROM conversation_messages WHERE session_id = ?',
                 (session,),
