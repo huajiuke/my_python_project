@@ -12,12 +12,16 @@
 |------|------|------|
 | 1 上下文工程 | ✅ 2026-09-27 | `agent_learning/token_budget.py`（26 个用例通过）；`obsidian/04-AI与职业/04.01-AI学习/04.01.05-上下文工程/` 六篇笔记 |
 | 2 结构化输出与校验 | ✅ 2026-09-27 | `agent_learning/structured_output.py`（28 个用例通过）；`obsidian/.../04.01.06-结构化输出与校验/` 六篇笔记 |
-| 3 检索实操 | ⏳ 待做 | — |
-| 4 评估与回归 | ⏳ 待做 | — |
+| 3 检索实操 | ✅ 2026-09-27 | `agent_learning/retrieval.py`（29 个用例通过）；`obsidian/04-AI与职业/04.01-AI学习/04.01.07-检索实操/` 五篇笔记 |
+| 4 评估与回归 | ✅ 2026-09-27 | `agent_learning/eval_harness.py`（24 个用例通过）；`obsidian/04-AI与职业/04.01-AI学习/04.01.08-评估与回归/` 五篇笔记 |
 
 主题 2 落点：把 function calling 的 `arguments` 字符串、卡片/缺口抽取结果统一走 Pydantic 严格模型校验，失败时按字段回喂重试（`structured_call`），并提供 `to_tool_schema` 让工具 schema 与校验规则同源。
 
 主题 1 落点：把 `agent_learning` 中按"轮数/字符"计量的三处上限（`max_history_rounds`、`summary_trigger_rounds`、`max_summary_chars`）改为按 token 表达，并提供分层预算与切分工具。
+
+主题 3 落点：用 `retrieval.py` 替掉 `note_search.py` 的"每次全量重扫 + 内存二元组计数"，改为按标题切块 + FTS5(trigram) 索引 + 段落级 `文件:起始行` 溯源。
+
+主题 4 落点：用 `eval_harness.py` 给 `NoteQAAgent` 建第一套用例与基线报告，之后每次改 prompt / 换模型 / 调检索参数都能拿到回归清单。
 
 ## 1. 技术补齐全景
 
@@ -48,7 +52,7 @@
 
 微调 / LoRA、多 agent 编排框架（LangGraph/CrewAI）、向量库调优、K8s 与分布式多租户。单用户本地应用全用不上，学了也讲不深。
 
-**补齐顺序**：上下文工程 → 结构化输出与校验 → 检索 → eval。不要先去学编排框架。
+**补齐顺序**：上下文工程 → 结构化输出与校验 → 检索 → eval（四项均已补齐，见 §0）。不要先去学编排框架。
 
 ## 2. 简历叙述框架
 

@@ -25,6 +25,8 @@
  ├── tool_calling_agent.py      # 从零实现：Tool + Registry + MockLLM + Agent
 ├── token_budget.py            # token 估算、分层预算裁剪、按 token 切分历史
 ├── structured_output.py       # 结构化输出：提取 + 严格校验 + 修复重试
+├── retrieval.py               # 检索：Markdown 切块 + FTS5 索引 + 段落级溯源
+├── eval_harness.py            # 评估：用例集 + 基线报告 + 回归对比
  └── test_tool_calling_agent.py # 单元测试，覆盖核心循环
  ```
 
@@ -166,6 +168,51 @@ response = structured_call(llm, NoteCard, messages, max_attempts=3)
 工具参数同样要校验（`validate_tool_arguments`），
 `to_tool_schema` 可由模型直接生成函数 schema，保证暴露给模型的规则与代码校验同源。
 
+## 检索实操
+
+`retrieval.py` 把“每次遍历目录、在内存里数命中”换成持久化索引：
+
+- **切块**：按 Markdown 标题切分，保留标题面包屑与行号；超长小节按 token 预算继续切，代码块不切断；
+- **索引**：SQLite FTS5，必须写 `tokenize='trigram'`——默认的 `unicode61` 不切分中文，`MATCH '缓存'` 实测查不到；
+- **检索**：长词走 FTS5 + bm25 排序；短词（不足 3 字符）或 FTS 无结果时回退 `LIKE`；
+- **溯源**：每条结果带 `文件:起始行`，行号重叠的结果会被丢弃。
+
+```python
+from agent_learning.retrieval import NoteIndex, format_hits
+
+index = NoteIndex('agent_learning/data/notes.db')   # 传 :memory: 用内存索引
+index.index_root('obsidian')
+hits = index.search('缓存命中', limit=3)
+print(format_hits(hits))
+```
+
+## 评估与回归
+
+`eval_harness.py` 用“用例 + 基线”回答两个问题：现在好不好、比上次好还是坏。
+验收标准是可执行检查（必须包含 / 禁止包含、工具调用、token 上限），不做主观打分。
+
+```python
+from agent_learning.eval_harness import EvalCase, Expectation, run_and_compare
+
+cases = [
+    EvalCase(
+        case_id='session-lifecycle',
+        question='Session 应该怎么管理？',
+        expectation=Expectation(must_include=('close',), max_tokens=2000),
+    ),
+]
+
+report, comparison = run_and_compare(
+    cases,
+    runner,                                          # (case) -> RunResult
+    report_path='agent_learning/data/eval_baseline.json',
+)
+print(comparison)
+```
+
+`runner` 由调用方提供（通常把 `NoteQAAgent.ask` 包一层）。单条用例抛异常只记为失败，
+不会中断整轮；与基线对比会给出**回归 / 改进 / 新增用例**三张清单。
+
 ## 扩展任务
 
 1. 已完成：增加 `get_current_time` 和受限文件读取工具，支持多工具选择
@@ -177,3 +224,5 @@ response = structured_call(llm, NoteCard, messages, max_attempts=3)
 7. 已完成：持久化会话支持滚动摘要压缩，并保留最近原始问答窗口
 8. 已完成：token 预算与分层上下文裁剪（`token_budget.py`）
 9. 已完成：结构化输出与工具参数校验（`structured_output.py`）
+10. 已完成：Markdown 切块 + FTS5 中文检索与段落级溯源（`retrieval.py`）
+11. 已完成：用例集、基线报告与回归对比（`eval_harness.py`）
