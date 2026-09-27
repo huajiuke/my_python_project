@@ -11,9 +11,11 @@
 | 主题 | 状态 | 产出 |
 |------|------|------|
 | 1 上下文工程 | ✅ 2026-09-27 | `agent_learning/token_budget.py`（26 个用例通过）；`obsidian/04-AI与职业/04.01-AI学习/04.01.05-上下文工程/` 六篇笔记 |
-| 2 结构化输出与校验 | ⏳ 待做 | — |
+| 2 结构化输出与校验 | ✅ 2026-09-27 | `agent_learning/structured_output.py`（28 个用例通过）；`obsidian/.../04.01.06-结构化输出与校验/` 六篇笔记 |
 | 3 检索实操 | ⏳ 待做 | — |
 | 4 评估与回归 | ⏳ 待做 | — |
+
+主题 2 落点：把 function calling 的 `arguments` 字符串、卡片/缺口抽取结果统一走 Pydantic 严格模型校验，失败时按字段回喂重试（`structured_call`），并提供 `to_tool_schema` 让工具 schema 与校验规则同源。
 
 主题 1 落点：把 `agent_learning` 中按"轮数/字符"计量的三处上限（`max_history_rounds`、`summary_trigger_rounds`、`max_summary_chars`）改为按 token 表达，并提供分层预算与切分工具。
 

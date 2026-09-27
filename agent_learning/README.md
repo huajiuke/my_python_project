@@ -23,6 +23,8 @@
  agent_learning/
  ├── README.md                  # 项目说明
  ├── tool_calling_agent.py      # 从零实现：Tool + Registry + MockLLM + Agent
+├── token_budget.py            # token 估算、分层预算裁剪、按 token 切分历史
+├── structured_output.py       # 结构化输出：提取 + 严格校验 + 修复重试
  └── test_tool_calling_agent.py # 单元测试，覆盖核心循环
  ```
 
@@ -141,6 +143,29 @@ python agent_learning/note_qa_agent.py --real --interactive `
 摘要写入同一会话的 `conversation_summaries` 表。若摘要模型临时失败，本轮回答
 仍会正常返回，摘要指针保持不变，未压缩内容会在后续轮次继续尝试压缩。
 
+## 结构化输出与校验
+
+`structured_output.py` 让 LLM 输出变成可靠接口，四层防御：schema 约束 → JSON 提取 →
+Pydantic 严格校验 → 按字段回喂重试。依赖 Pydantic：
+
+```powershell
+python -m pip install pydantic
+```
+
+```python
+from pydantic import Field
+from agent_learning.structured_output import StrictModel, structured_call
+
+class NoteCard(StrictModel):
+    title: str
+    confidence: float = Field(ge=0.0, le=1.0)
+
+response = structured_call(llm, NoteCard, messages, max_attempts=3)
+```
+
+工具参数同样要校验（`validate_tool_arguments`），
+`to_tool_schema` 可由模型直接生成函数 schema，保证暴露给模型的规则与代码校验同源。
+
 ## 扩展任务
 
 1. 已完成：增加 `get_current_time` 和受限文件读取工具，支持多工具选择
@@ -150,3 +175,5 @@ python agent_learning/note_qa_agent.py --real --interactive `
 5. 已完成：结构化日志记录 Agent、LLM、工具调用、状态和耗时，并自动脱敏
 6. 已完成：通过 `RunContext` 给每次请求独立设置工具白名单和写权限
 7. 已完成：持久化会话支持滚动摘要压缩，并保留最近原始问答窗口
+8. 已完成：token 预算与分层上下文裁剪（`token_budget.py`）
+9. 已完成：结构化输出与工具参数校验（`structured_output.py`）
