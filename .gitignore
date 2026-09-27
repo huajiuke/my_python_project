@@ -1,4 +1,4 @@
-﻿__pycache__/
+__pycache__/
 *.py[cod]
 .pytest_cache/
 .idea/
@@ -8,3 +8,9 @@ venv/
 .env.local
 tasks.json
 *.db
+.env
+.tools/
+fastapi_learning/react_frontend/node_modules/
+fastapi_learning/react_frontend/dist/
+obsidian/.obsidian/workspace*.json
+obsidian/.obsidian/graph.json
