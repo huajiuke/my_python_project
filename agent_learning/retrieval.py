@@ -324,7 +324,10 @@ class NoteIndex:
         return hits
 
     def _search_fts(self, terms: Sequence[str], limit: int) -> list[SearchHit]:
-        query = ' AND '.join(_quote_fts_term(term) for term in terms)
+        # 用 OR 而不是 AND：问题式查询常带"应该怎么管理？"这类疑问短语，
+        # AND 会因为其中一个词不命中就把整条查询变成零结果。bm25 天然让
+        # "命中词更多、词频更高"的块排前面，放宽连接词不会牺牲排序。
+        query = ' OR '.join(_quote_fts_term(term) for term in terms)
         rows = self._connection.execute(
             """
             SELECT text, source, heading, start_line, end_line, bm25(chunks) AS score

@@ -140,6 +140,13 @@ class NoteIndexSearchTest(unittest.TestCase):
         self.assertTrue(hits)
         self.assertIn('token', hits[0].text)
 
+    def test_multi_term_query_matches_partial_document(self) -> None:
+        # 问题式查询里总会有词不命中；只要有一个词命中就应该召回。
+        hits = self.index.search('token 完全没出现过的疑问短语')
+
+        self.assertTrue(hits)
+        self.assertIn('token', hits[0].text)
+
     def test_hit_carries_provenance(self) -> None:
         hits = self.index.search('token')
         hit = hits[0]

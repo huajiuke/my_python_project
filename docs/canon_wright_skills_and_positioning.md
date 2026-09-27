@@ -23,6 +23,8 @@
 
 主题 4 落点：用 `eval_harness.py` 给 `NoteQAAgent` 建第一套用例与基线报告，之后每次改 prompt / 换模型 / 调检索参数都能拿到回归清单。
 
+四个主题已在 `agent_learning/note_qa_agent.py` 汇合：检索默认走 FTS5 索引（`--no-index` 可退回旧的关键词检索），上下文按 token 预算分层裁剪（超预算先丢对话历史、再丢摘要，最后才动检索片段），`--structured` 可要求模型返回 `answer/citations` 并在校验失败时退回自由文本；`note_qa_eval.py` 提供离线 / 真实两种评估跑法，报告落成基线供下次对比。
+
 ## 1. 技术补齐全景
 
 ### 1.1 必补（挡住 MVP 的就这五个）

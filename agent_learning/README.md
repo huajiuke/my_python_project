@@ -27,6 +27,8 @@
 ├── structured_output.py       # 结构化输出：提取 + 严格校验 + 修复重试
 ├── retrieval.py               # 检索：Markdown 切块 + FTS5 索引 + 段落级溯源
 ├── eval_harness.py            # 评估：用例集 + 基线报告 + 回归对比
+├── note_qa_agent.py           # 汇合点：检索 + token 预算 + 结构化回答
+├── note_qa_eval.py            # NoteQAAgent 的用例集与基线回归
  └── test_tool_calling_agent.py # 单元测试，覆盖核心循环
  ```
 
@@ -213,6 +215,42 @@ print(comparison)
 `runner` 由调用方提供（通常把 `NoteQAAgent.ask` 包一层）。单条用例抛异常只记为失败，
 不会中断整轮；与基线对比会给出**回归 / 改进 / 新增用例**三张清单。
 
+## 四个主题在 note_qa_agent 汇合
+
+`note_qa_agent.py` 把前面四块拼成一条真实流水线：
+
+```text
+问题 → FTS5 检索（带 文件:起始行）→ 按 token 预算分层组装
+     → LLM 回答（可选结构化 answer/citations）→ 附来源
+```
+
+- **检索**：默认走 `NoteIndex`（FTS5 + trigram 分词器），`--no-index` 可退回旧的
+  全量扫描关键词检索；`--rebuild-index` 重建索引，默认库在
+  `agent_learning/data/notes.db`（已被 `.gitignore` 忽略）；
+- **预算**：`--context-budget` / `--reserve-output` 控制单次请求的 token 预算。
+  超预算时先丢对话历史，再丢摘要，最后才动检索片段；系统提示永不裁剪。
+  每轮的预算报告在 `agent.last_budget_report`，可以直接进日志；
+- **结构化**：`--structured` 让模型返回 `{"answer": ..., "citations": [1, 2]}`，
+  校验通过后来源清单只列真正引用的片段；模型不配合就自动退回自由文本，
+  所以这个开关不会让 Agent 变得不可用。
+
+```powershell
+python agent_learning/note_qa_agent.py --mock "FTS5 中文 分词器"        # 离线看检索
+python agent_learning/note_qa_agent.py --real --structured "Session 应该怎么管理？"
+python agent_learning/note_qa_agent.py --real --no-index "Session 管理"  # 退回旧检索
+```
+
+评估与回归（改 prompt / 换模型之后跑一遍）：
+
+```powershell
+python agent_learning/note_qa_eval.py --offline   # 无需 API Key，只验证检索与上下文
+python agent_learning/note_qa_eval.py --real      # 端到端回答
+```
+
+`--offline` 用一个"把检索到的上下文原样当答案"的假模型，因此它验证的是
+**检索与上下文组装有没有退化**，不验证语言质量。报告存成基线，
+下次运行会给出回归 / 改进 / 新增用例清单。笔记不在仓库根目录时用
+`--note-root` 指定（可重复）。
 ## 扩展任务
 
 1. 已完成：增加 `get_current_time` 和受限文件读取工具，支持多工具选择
@@ -226,3 +264,5 @@ print(comparison)
 9. 已完成：结构化输出与工具参数校验（`structured_output.py`）
 10. 已完成：Markdown 切块 + FTS5 中文检索与段落级溯源（`retrieval.py`）
 11. 已完成：用例集、基线报告与回归对比（`eval_harness.py`）
+12. 已完成：NoteQAAgent 接入 FTS5 检索、token 预算与结构化回答（`note_qa_agent.py`）
+13. 已完成：NoteQAAgent 的用例集与基线回归（`note_qa_eval.py`）
