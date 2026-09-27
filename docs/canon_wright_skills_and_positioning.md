@@ -6,6 +6,17 @@
 > 产品共识：[产品宪法 v0.1](https://github.com/huajiuke/canon-wright/blob/main/docs/product-constitution.md) ｜ 本地仓库：`D:\13155\canon-wright`
 > 状态：项目处于理念阶段，未开工。本文档解决两件事：**要补哪些技术**、**这个项目如何变成简历资产**。
 
+## 0. 补足进度
+
+| 主题 | 状态 | 产出 |
+|------|------|------|
+| 1 上下文工程 | ✅ 2026-09-27 | `agent_learning/token_budget.py`（26 个用例通过）；`obsidian/04-AI与职业/04.01-AI学习/04.01.05-上下文工程/` 六篇笔记 |
+| 2 结构化输出与校验 | ⏳ 待做 | — |
+| 3 检索实操 | ⏳ 待做 | — |
+| 4 评估与回归 | ⏳ 待做 | — |
+
+主题 1 落点：把 `agent_learning` 中按"轮数/字符"计量的三处上限（`max_history_rounds`、`summary_trigger_rounds`、`max_summary_chars`）改为按 token 表达，并提供分层预算与切分工具。
+
 ## 1. 技术补齐全景
 
 ### 1.1 必补（挡住 MVP 的就这五个）
